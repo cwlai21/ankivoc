@@ -1,0 +1,19 @@
+[project]
+name = "langchain-ai"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "dotenv>=0.9.9",
+    "google-api-python-client>=2.176.0",
+    "google-auth>=2.40.3",
+    "google-auth-httplib2>=0.2.0",
+    "google-auth-oauthlib>=1.2.2",
+    "google-generativeai>=0.8.5",
+    "llama-index>=0.12.48",
+    "llama-index-llms-gemini>=0.5.0",
+    "llama-index-readers-google>=0.6.2.post1",
+    "openai>=1.95.1",
+    "requests>=2.32.4",
+]
