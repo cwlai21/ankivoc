@@ -4,3 +4,4 @@
 .env
 *.json
 test.py
+anki_voc_*.csv
