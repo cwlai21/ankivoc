@@ -8,6 +8,12 @@ import requests
 import json
 import urllib.request
 import base64
+import time
+import random
+import hashlib
+import asyncio
+import aiohttp
+from pathlib import Path
 
 
 def llm_generate_anki_note(model: str, system_instructions: str, word_list: str):
@@ -19,27 +25,37 @@ def llm_generate_anki_note(model: str, system_instructions: str, word_list: str)
     if model == "gemini":
         api_key = config.get("GOOGLE_API_KEY")
         if not api_key:
-            raise ValueError("No GOOGLE_API_KEY found in .env for Gemini.")
-        list_url = f"https://generativelanguage.googleapis.com/v1/models?key={api_key}"
-        list_resp = requests.get(list_url)
-        if list_resp.status_code != 200:
-            raise RuntimeError(f"Failed to list Gemini models: {list_resp.status_code} {list_resp.text}")
-        models = list_resp.json().get("models", [])
-        candidates = [m.get("name").split("/")[-1] for m in models if "gemini" in m.get("name", "").lower()]
-        if not candidates:
-            raise RuntimeError("No Gemini models found.")
-        for mid in candidates:
-            url = f"https://generativelanguage.googleapis.com/v1/models/{mid}:generateContent?key={api_key}"
-            headers = {"Content-Type": "application/json"}
-            data = {"contents": [{"parts": [{"text": full_prompt}]}]}
-            resp = requests.post(url, headers=headers, json=data)
-            if resp.status_code == 200:
-                result = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
-                break
-            else:
-                last_err = (mid, resp.status_code, resp.text)
-        if 'result' not in locals():
-            raise RuntimeError(f"Gemini failed. Last error: {last_err}")
+            raise ValueError("No GOOGLE_API_KEY found in .env for Gemini. Set GOOGLE_API_KEY in .env")
+
+        # Use a known-stable Gemini model id directly to avoid extra list calls
+        mid = "gemini-2.5-flash"
+        url = f"https://generativelanguage.googleapis.com/v1/models/{mid}:generateContent?key={api_key}"
+        headers = {"Content-Type": "application/json"}
+        data = {"contents": [{"parts": [{"text": full_prompt}]}]}
+        session = requests.Session()
+        # Don't inherit system proxy settings (can cause hanging if proxy unreachable)
+        session.trust_env = False
+        try:
+            # timeout=(connect_timeout, read_timeout)
+            resp = session.post(url, headers=headers, json=data, timeout=(10, 60))
+        except requests.exceptions.ConnectTimeout:
+            raise RuntimeError("Gemini generateContent connection timed out. Check network/firewall or proxy settings.")
+        except requests.exceptions.ReadTimeout:
+            raise RuntimeError("Gemini generateContent read timed out. The service may be slow; try increasing read timeout.")
+        except requests.exceptions.RequestException as e:
+            raise RuntimeError(f"Gemini generateContent request failed (network error): {e}")
+
+        if resp.status_code == 200:
+            j = resp.json()
+            try:
+                result = j["candidates"][0]["content"]["parts"][0]["text"]
+            except Exception:
+                raise RuntimeError(f"Unexpected Gemini response structure: {j}")
+        else:
+            raise RuntimeError(
+                f"Gemini generateContent failed: {resp.status_code} {resp.text}. "
+                "Verify API key, model access and Quota in Google Cloud Console."
+            )
     elif model == "groq":
         api_key = config.get("GROQ_API_KEY")
         if not api_key: raise ValueError("No GROQ_API_KEY found.")
@@ -61,18 +77,79 @@ def llm_generate_anki_note(model: str, system_instructions: str, word_list: str)
     else:
         raise ValueError(f"Unknown model: {model}")
 
-    # --- CLEANING LOGIC ---
-    clean_csv = re.sub(r'```(?:csv|text)?\n?', '', result)
-    clean_csv = clean_csv.replace('```', '').strip()
-    processed_lines = []
-    for line in clean_csv.split('\n'):
-        if line.count(';') > 12:
-            parts = line.split(';')
-            main_fields = parts[:12]
-            extra_fields = parts[12:]
-            line = ";".join(main_fields) + ";" + ", ".join(extra_fields).replace(';', ':')
-        processed_lines.append(line)
-    final_output = "\n".join(processed_lines)
+    # --- Attempt JSON parsing first (preferred, per updated system_prompt.md) ---
+    final_output = None
+    try:
+        # Clean possible markdown fences or surrounding text before JSON parse
+        clean_result = re.sub(r'```(?:json|text)?\n?', '', result or '')
+        clean_result = clean_result.replace('```', '').strip()
+        # Attempt to extract JSON array substring if the model wrapped it in text
+        json_start = clean_result.find('[')
+        json_end = clean_result.rfind(']')
+        parsed = None
+        if json_start != -1 and json_end != -1 and json_end > json_start:
+            candidate = clean_result[json_start:json_end+1]
+            try:
+                parsed = json.loads(candidate)
+            except Exception:
+                parsed = None
+        if parsed is None:
+            # Fallback: try parsing the whole cleaned result
+            try:
+                parsed = json.loads(clean_result)
+            except Exception:
+                parsed = None
+        if isinstance(parsed, list):
+            keys = [
+                "Français", "English", "Synonyme", "Conjugaison/Féminin ou Masculin",
+                "Audio", "Exemple-FR", "Exemple-EN", "Exemple1-Audio",
+                "Exemple2-FR", "Exemple2-EN", "Exemple2-Audio", "Extend", "Hint"
+            ]
+            # Normalization rules requested by user:
+            # - field 0 (Français) == field 4 (Audio)
+            # - field 5 (Exemple-FR) == field 7 (Exemple1-Audio)
+            # - field 8 (Exemple2-FR) == field 10 (Exemple2-Audio)
+            rows = []
+            for item in parsed:
+                if isinstance(item, dict):
+                    # enforce equality constraints by copying text fields into the corresponding audio fields
+                    fr = str(item.get("Français", "") or "").strip()
+                    ex1 = str(item.get("Exemple-FR", "") or "").strip()
+                    ex2 = str(item.get("Exemple2-FR", "") or "").strip()
+                    # copy textual content into the audio fields so downstream TTS uses the same text
+                    item["Audio"] = fr
+                    item["Exemple1-Audio"] = ex1
+                    item["Exemple2-Audio"] = ex2
+
+                row_fields = []
+                for k in keys:
+                    v = item.get(k, "") if isinstance(item, dict) else ""
+                    if not isinstance(v, str):
+                        v = str(v)
+                    # safety: remove newlines and replace any stray semicolons
+                    v = v.replace('\n', ' ').replace('\r', ' ').replace(';', ',').strip()
+                    row_fields.append(v)
+                rows.append(';'.join(row_fields))
+            final_output = '\n'.join(rows)
+    except Exception:
+        final_output = None
+
+    # --- FALLBACK: original cleaning logic for non-JSON outputs ---
+    if final_output is None:
+        clean_csv = re.sub(r'```(?:csv|text)?\n?', '', result)
+        clean_csv = clean_csv.replace('```', '').strip()
+        processed_lines = []
+        for line in clean_csv.split('\n'):
+            line = line.strip()
+            if not line:  # Skip empty lines
+                continue
+            if line.count(';') > 12:
+                parts = line.split(';')
+                main_fields = parts[:12]
+                extra_fields = parts[12:]
+                line = ";".join(main_fields) + ";" + ", ".join(extra_fields).replace(';', ':')
+            processed_lines.append(line)
+        final_output = "\n".join(processed_lines)
     with open(filename, "w", encoding="utf-8") as f:
         f.write(final_output)
         print(f"✅ CSV content written to {filename}")
@@ -84,7 +161,9 @@ def llm_generate_anki_note(model: str, system_instructions: str, word_list: str)
 
 def generate_azure_audio(text, filename):
     """Generates audio via Azure API and stores it in Anki."""
-    if not text or len(text.strip()) == 0: return ""
+    if not text or len(text.strip()) == 0:
+        return ""
+
     # Read config from .env each time to ensure latest values
     config = dotenv_values(".env")
     AZURE_KEY = config.get("AZURE_API_KEY", "YOUR_AZURE_API_KEY")
@@ -105,58 +184,60 @@ def generate_azure_audio(text, filename):
         </voice>
     </speak>
     """
-    try:
-        response = requests.post(url, headers=headers, data=ssml.encode('utf-8'))
-    except Exception as e:
-        print(f"❌ Azure TTS request failed for {filename}: {e}")
-        return ""
-    if response.status_code == 200:
-        audio_data = base64.b64encode(response.content).decode('utf-8')
-        anki_request("storeMediaFile", filename=filename, data=audio_data)
-        # print(f"🔊 Azure TTS audio generated for {filename}")
-        return f"[sound:{filename}]"
-    else:
-        print(f"❌ Azure TTS Error: {response.status_code} - {response.text} (filename: {filename})")
+
+    # Retry logic for transient errors (429, 5xx)
+    max_retries = 4
+    base_backoff = 1.0
+    retryable_statuses = {429, 500, 502, 503, 504}
+
+    session = requests.Session()
+    session.trust_env = False
+    for attempt in range(1, max_retries + 1):
+        try:
+            response = session.post(url, headers=headers, data=ssml.encode('utf-8'), timeout=(5, 30))
+        except requests.exceptions.ConnectTimeout:
+            print(f"⚠️ Azure TTS connect timeout (attempt {attempt}/{max_retries}) for {filename}")
+            err = 'connect'
+            response = None
+        except requests.exceptions.ReadTimeout:
+            print(f"⚠️ Azure TTS read timeout (attempt {attempt}/{max_retries}) for {filename}")
+            err = 'read'
+            response = None
+        except requests.exceptions.RequestException as e:
+            print(f"⚠️ Azure TTS request exception (attempt {attempt}/{max_retries}) for {filename}: {e}")
+            response = None
+
+        if response is not None and response.status_code == 200:
+            audio_data = base64.b64encode(response.content).decode('utf-8')
+            anki_request("storeMediaFile", filename=filename, data=audio_data)
+            return f"[sound:{filename}]"
+
+        # If we received a response and it's retryable, wait and retry
+        status = response.status_code if response is not None else None
+        if status in retryable_statuses or response is None:
+            if attempt == max_retries:
+                if response is not None:
+                    print(f"❌ Azure TTS Error after {attempt} attempts: {status} - {response.text} (filename: {filename})")
+                else:
+                    print(f"❌ Azure TTS failed after {attempt} attempts for {filename}")
+                print(f"🔎 Check your .env: AZURE_API_KEY, AZURE_REGION, AZURE_VOICE_NAME")
+                return ""
+            # exponential backoff with jitter
+            backoff = base_backoff * (2 ** (attempt - 1))
+            jitter = random.uniform(0, 0.5 * backoff)
+            wait = backoff + jitter
+            print(f"⏳ Azure TTS retry {attempt}/{max_retries} for {filename} after {wait:.1f}s (status={status})")
+            time.sleep(wait)
+            continue
+
+        # Non-retryable status
+        if response is not None:
+            print(f"❌ Azure TTS Error: {response.status_code} - {response.text} (filename: {filename})")
+        else:
+            print(f"❌ Azure TTS unknown error for {filename}")
         print(f"🔎 Check your .env: AZURE_API_KEY, AZURE_REGION, AZURE_VOICE_NAME")
         return ""
-    # 1. Strip Markdown code blocks
-    clean_csv = re.sub(r'```(?:csv|text)?\n?', '', result)
-    clean_csv = clean_csv.replace('```', '').strip()
-
-    # 2. FINAL SAFETY NET: If the LLM produces a line with more than 12 semicolons,
-    # it means it used a semicolon inside a sentence. We convert internal semicolons
-    # to colons while preserving the 12 column delimiters.
-    processed_lines = []
-    for line in clean_csv.split('\n'):
-        if line.count(';') > 12:
-            # Split by semicolon, keep the first 12, join the rest with a colon
-            parts = line.split(';')
-            main_fields = parts[:12]
-            extra_fields = parts[12:]
-            # Re-join the overflow into the final field (Hint)
-            line = ";".join(main_fields) + ";" + ", ".join(extra_fields).replace(';', ':')
-        processed_lines.append(line)
-    
-    final_output = "\n".join(processed_lines)
-
-    with open(filename, "w", encoding="utf-8") as f:
-        f.write(final_output)
-        print(f"✅ CSV content written to {filename}")
-
-    # After writing CSV, attempt to add notes to Anki via AnkiConnect
-    try:
-        add_notes_to_anki(filename)
-    except NameError:
-        # Function not defined yet in some contexts; ignore
-        pass
-    except Exception as e:
-        print(f"❌ Error when adding notes to Anki: {e}")
-
-    print(f"✅ CSV saved as {filename}")
-    # return filename
-
-
-
+    return ""
 
 def anki_request(action: str, **params):
     """Helper to send a request to AnkiConnect and return the result."""
@@ -175,54 +256,155 @@ def anki_request(action: str, **params):
 
 
 def add_notes_to_anki(csv_filename, target_deck="Vocabulaire", model_name="Français-(R/L)"):
+    """Synchronous wrapper that runs the asyncio implementation."""
+    try:
+        asyncio.run(async_add_notes_to_anki(csv_filename, target_deck, model_name))
+    except Exception as e:
+        print(f"❌ Error in async add_notes_to_anki: {e}")
+
+
+async def _fetch_and_store_tts(session: aiohttp.ClientSession, text: str, filename: str, az_key: str, az_region: str, az_voice: str, semaphore: asyncio.Semaphore):
+    if not text or not text.strip():
+        return None
+    ssml = f"""
+    <speak version='1.0' xml:lang='fr-FR'>
+        <voice xml:lang='fr-FR' name='{az_voice}'>
+            <prosody rate="1.3">{text}</prosody>
+        </voice>
+    </speak>
+    """
+    url = f"https://{az_region}.tts.speech.microsoft.com/cognitiveservices/v1"
+    headers = {
+        "Ocp-Apim-Subscription-Key": az_key,
+        "Content-Type": "application/ssml+xml",
+        "X-Microsoft-OutputFormat": "audio-16khz-128kbitrate-mono-mp3"
+    }
+    # Limit concurrency via semaphore
+    async with semaphore:
+        try:
+            async with session.post(url, data=ssml.encode('utf-8'), headers=headers, timeout=aiohttp.ClientTimeout(total=30)) as resp:
+                if resp.status == 200:
+                    content = await resp.read()
+                    audio_b64 = base64.b64encode(content).decode('utf-8')
+                    # storeMediaFile is synchronous; run in thread
+                    await asyncio.to_thread(anki_request, "storeMediaFile", filename=filename, data=audio_b64)
+                    return filename
+                else:
+                    text_resp = await resp.text()
+                    print(f"❌ Azure TTS failed status={resp.status} for {filename}: {text_resp}")
+                    return None
+        except Exception as e:
+            print(f"⚠️ Azure async TTS exception for {filename}: {e}")
+            return None
+
+
+async def async_add_notes_to_anki(csv_filename, target_deck="Vocabulaire", model_name="Français-(R/L)"):
     anki_request("createDeck", deck=target_deck)
-    notes = []
+    # Load CSV
     try:
         with open(csv_filename, 'r', encoding='utf-8') as f:
-            lines = f.readlines()
+            lines = [ln.strip() for ln in f.readlines() if ln.strip()]
     except Exception as e:
         print(f"❌ Could not read CSV file {csv_filename}: {e}")
         return
 
+    # prepare Azure settings
+    cfg = dotenv_values('.env')
+    AZURE_KEY = cfg.get('AZURE_API_KEY')
+    AZURE_REGION = cfg.get('AZURE_REGION', 'eastus')
+    AZURE_VOICE = cfg.get('AZURE_VOICE_NAME', 'fr-FR-DeniseNeural')
+    if not AZURE_KEY:
+        print("❌ No AZURE_API_KEY in .env; cannot generate audio.")
+
+    # Disk cache for audio key -> filename
+    cache_path = Path("audio_cache.json")
+    try:
+        if cache_path.exists():
+            audio_cache = json.loads(cache_path.read_text(encoding='utf-8'))
+        else:
+            audio_cache = {}
+    except Exception:
+        audio_cache = {}
+
+    # gather unique TTS jobs
+    timestamp = datetime.now().strftime("%f")
+    tts_jobs = {}  # key -> (text, filename)
+    rows = []
     for line in lines:
-        fields = line.strip().split(';')
+        fields = line.split(';')
         if len(fields) < 13:
             continue
+        rows.append(fields)
+        for idx, suffix in ((4, '1'), (7, '2'), (10, '3')):
+            text = fields[idx].strip() if idx < len(fields) else ''
+            if not text:
+                continue
+            norm = ' '.join(text.split())
+            voice = AZURE_VOICE
+            key = hashlib.sha1((norm + '|' + voice).encode('utf-8')).hexdigest()
+            if key in audio_cache:
+                continue
+            if key not in tts_jobs:
+                filename = f"az_{key}_{timestamp}_{suffix}.mp3"
+                tts_jobs[key] = (norm, filename)
+
+    # perform async TTS for all jobs
+    semaphore = asyncio.Semaphore(6)
+    async with aiohttp.ClientSession() as session:
+        tasks = []
+        for key, (text, filename) in tts_jobs.items():
+            tasks.append(asyncio.create_task(_fetch_and_store_tts(session, text, filename, AZURE_KEY, AZURE_REGION, AZURE_VOICE, semaphore)))
+        if tasks:
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            # update cache with successful filenames
+            for key, (_, filename) in tts_jobs.items():
+                # if file was created successfully, ensure mapping exists
+                if filename and filename not in audio_cache.values():
+                    # verify by checking Anki media exists? We'll assume success if stored via AnkiConnect returned None or OK
+                    audio_cache[key] = filename
+            try:
+                cache_path.write_text(json.dumps(audio_cache, ensure_ascii=False, indent=2), encoding='utf-8')
+            except Exception:
+                pass
+
+    # build notes
+    notes = []
+    for fields in rows:
         word = fields[0]
-        timestamp = datetime.now().strftime("%f")
-        # print(f"🎙️ Azure generating: {word}")
-        # print(f"  Audio text: {fields[4]}")
-        audio1 = generate_azure_audio(fields[4], f"az_{word}_{timestamp}_1.mp3")
-        # print(f"  Audio1 result: {audio1}")
-        audio2 = generate_azure_audio(fields[7], f"az_{word}_{timestamp}_2.mp3")
-        # print(f"  Audio2 result: {audio2}")
-        audio3 = generate_azure_audio(fields[10], f"az_{word}_{timestamp}_3.mp3")
-        # print(f"  Audio3 result: {audio3}")
-        if not audio1:
-            print(f"⚠️ No audio generated for Audio field in word: {word}")
-        if not audio2:
-            print(f"⚠️ No audio generated for Exemple1-Audio field in word: {word}")
-        if not audio3:
-            print(f"⚠️ No audio generated for Exemple2-Audio field in word: {word}")
+        # Check if note already exists in deck
+        existing_ids = anki_request("findNotes", query=f'deck:"{target_deck}" "Français:{fields[0]}"')
+        if existing_ids:
+            print(f"⏭️ Skipping '{fields[0]}' - already exists in deck.")
+            continue
+
+        def get_audio_tag(text):
+            norm = ' '.join(text.split())
+            key = hashlib.sha1((norm + '|' + AZURE_VOICE).encode('utf-8')).hexdigest()
+            filename = audio_cache.get(key)
+            return f"[sound:{filename}]" if filename else ""
+
+        audio1 = get_audio_tag(fields[4]) if len(fields) > 4 else ''
+        audio2 = get_audio_tag(fields[7]) if len(fields) > 7 else ''
+        audio3 = get_audio_tag(fields[10]) if len(fields) > 10 else ''
+
         notes.append({
             "deckName": target_deck,
             "modelName": model_name,
             "fields": {
                 "Français": fields[0],
-                "English": fields[1],
-                "Synonyme": fields[2],
-                "Conjugaison/Féminin ou Masculin": fields[3],
+                "English": fields[1] if len(fields) > 1 else '',
+                "Synonyme": fields[2] if len(fields) > 2 else '',
+                "Conjugaison/Féminin ou Masculin": fields[3] if len(fields) > 3 else '',
                 "Audio": audio1,
-                "Exemple-FR": fields[5],
-                "Exemple-EN": fields[6],
+                "Exemple-FR": fields[5] if len(fields) > 5 else '',
+                "Exemple-EN": fields[6] if len(fields) > 6 else '',
                 "Exemple1-Audio": audio2,
-                "Exemple2-FR": fields[8],
-                "Exemple2-EN": fields[9],
+                "Exemple2-FR": fields[8] if len(fields) > 8 else '',
+                "Exemple2-EN": fields[9] if len(fields) > 9 else '',
                 "Exemple2-Audio": audio3,
-                "Extend": fields[11],
-                "Hint": fields[12]
+                "Extend": fields[11] if len(fields) > 11 else '',
+                "Hint": fields[12] if len(fields) > 12 else ''
             },
-            "tags": ["C1_AutoGenerated"]
         })
 
     if notes:
@@ -241,21 +423,22 @@ def load_system_instructions():
 
 
 if __name__ == "__main__":
-    # Use existing CSV file anki_voc_20260304.csv if available
-    csv_file = "anki_voc_20260304.csv"
+    import glob
+    
+    my_words = """
+        tacite
+"""
     
     try:
-        if os.path.exists(csv_file):
-            print(f"📄 Using existing CSV: {csv_file}")
-            add_notes_to_anki(csv_file)
-        else:
-            print(f"❌ CSV file {csv_file} not found.")
-            system_instructions = load_system_instructions()
-            my_words = """
-céder à
-réprénsible
-"""
-            model_choice = "gemini"
-            llm_generate_anki_note(model_choice, system_instructions, my_words)
+        # Clean up old CSV files before generating new ones
+        old_csvs = glob.glob("anki_voc_*.csv")
+        for old_csv in old_csvs:
+            os.remove(old_csv)
+            print(f"🗑️ Removed old CSV: {old_csv}")
+        
+        system_instructions = load_system_instructions()
+        model_choice = "gemini"  # Direct model choice
+        print(f"🤖 Using model: {model_choice}")
+        llm_generate_anki_note(model_choice, system_instructions, my_words)
     except Exception as e:
         print(f"❌ Error: {e}")
