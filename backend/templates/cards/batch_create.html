@@ -1,0 +1,771 @@
+{% extends 'base.html' %}
+
+{% block title %}New Vocabulary Batch — Anki Vocab Builder{% endblock %}
+
+{% block content %}
+
+<div class="row justify-content-center">
+
+    <div class="col-md-8">
+
+
+        <h2 class="mb-4"><i class="bi bi-plus-circle"></i> Add Vocabulary</h2>
+
+
+        <!-- ── Status Messages ── -->
+
+        <div id="batch-message" class="alert d-none"></div>
+
+
+        <!-- ═══════════════════════════════════════════ -->
+        <!-- Language Selection                          -->
+        <!-- ═══════════════════════════════════════════ -->
+
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-translate"></i> Language Settings</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="target-language" class="form-label">
+                            I want to learn <span class="text-danger">*</span>
+                        </label>
+                        <select id="target-language" class="form-select" required>
+                            <option value="">-- Select Target Language --</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="explanation-language" class="form-label">
+                            Explain in <span class="text-danger">*</span>
+                        </label>
+                        <select id="explanation-language" class="form-select" required>
+                            <option value="">-- Select Explanation Language --</option>
+                        </select>
+                    </div>
+                </div>
+
+
+                <!-- Template Info -->
+
+                <div id="template-info" class="alert alert-info d-none">
+                    <i class="bi bi-info-circle"></i>
+                    <span id="template-info-text"></span>
+                </div>
+            </div>
+        </div>
+
+
+        <!-- ═══════════════════════════════════════════ -->
+        <!-- Vocabulary Input                            -->
+        <!-- ═══════════════════════════════════════════ -->
+
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0"><i class="bi bi-pencil"></i> Vocabulary Words</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label for="vocabulary-input" class="form-label">
+                        Enter vocabulary (one word/phrase per line)
+                        <span class="text-danger">*</span>
+                    </label>
+                    <textarea id="vocabulary-input"
+                              class="form-control"
+                              rows="10"
+                              placeholder="de la pomme
+
+du fromage
+
+le bonheur
+
+courir
+
+magnifique"
+                              required></textarea>
+                    <div class="form-text">
+                        <i class="bi bi-lightbulb"></i>
+                        Enter words in <strong>any language</strong>.
+                        Include articles/prepositions if needed (e.g., "de la pomme").
+                        <br><strong>Maximum 50 words per batch.</strong>
+                    </div>
+                </div>
+
+
+                <div class="d-flex justify-content-between align-items-center">
+                    <span id="word-count" class="text-muted">0 words</span>
+                    <button type="button"
+                            class="btn btn-success btn-lg"
+                            id="submit-batch-btn"
+                            disabled>
+                        <i class="bi bi-send"></i> Generate Cards
+                    </button>
+                </div>
+            </div>
+        </div>
+
+
+        <!-- ═══════════════════════════════════════════ -->
+        <!-- Processing Progress                         -->
+        <!-- ═══════════════════════════════════════════ -->
+
+        <div id="processing-section" class="card shadow-sm mb-4 d-none">
+            <div class="card-header bg-warning">
+                <h5 class="mb-0">
+                    <span class="spinner-border spinner-border-sm"></span>
+                    Processing
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="progress mb-3" style="height: 25px;">
+                    <div id="progress-bar"
+                         class="progress-bar progress-bar-striped progress-bar-animated"
+                         role="progressbar"
+                         style="width: 0%">
+                        0%
+                    </div>
+                </div>
+                <p id="processing-status" class="text-center text-muted mb-0">
+                    Preparing...
+                </p>
+            </div>
+        </div>
+
+
+        <!-- ═══════════════════════════════════════════ -->
+        <!-- Results                                     -->
+        <!-- ═══════════════════════════════════════════ -->
+
+        <div id="results-section" class="card shadow-sm mb-4 d-none">
+            <div class="card-header" id="results-header">
+                <h5 class="mb-0" id="results-title"></h5>
+            </div>
+            <div class="card-body">
+                <!-- Summary badges -->
+                <div id="results-summary" class="mb-3"></div>
+
+                <!-- Results table -->
+                <div class="table-responsive">
+                    <table class="table table-hover" id="results-table">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width:40px;">#</th>
+                                <th>Input</th>
+                                <th>Target Word</th>
+                                <th>Translation</th>
+                                <th style="width:100px;">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="results-body">
+                        </tbody>
+                    </table>
+                </div>
+
+
+                <!-- Retry and New Batch buttons -->
+                <div class="d-flex gap-2 mt-3">
+                    <div id="retry-section" class="d-none">
+                        <button type="button" class="btn btn-warning" id="retry-btn">
+                            <i class="bi bi-arrow-repeat"></i> Retry Failed Cards
+                        </button>
+                    </div>
+                    <button type="button" class="btn btn-primary" id="new-batch-btn" style="display:none;">
+                        <i class="bi bi-plus-circle"></i> New Batch
+                    </button>
+                </div>
+            </div>
+        </div>
+
+
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// State
+// ═══════════════════════════════════════════════════════════════════
+
+var selectedTargetCode = '';
+var selectedExplanationCode = '';
+var currentBatchId = null;
+
+// ═══════════════════════════════════════════════════════════════════
+// Utility Functions
+// ═══════════════════════════════════════════════════════════════════
+
+function getCookie(name) {
+    var value = null;
+    document.cookie.split(';').forEach(function(c) {
+        c = c.trim();
+        if (c.startsWith(name + '=')) {
+            value = c.substring(name.length + 1);
+        }
+    });
+    return value;
+}
+
+function showBatchMessage(type, text) {
+    var div = document.getElementById('batch-message');
+    div.className = 'alert alert-' + type + ' alert-dismissible fade show';
+    div.innerHTML = text +
+        '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
+    div.classList.remove('d-none');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function setButtonLoading(btn, loading, originalHTML) {
+    if (loading) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Processing...';
+    } else {
+        btn.disabled = false;
+        btn.innerHTML = originalHTML;
+    }
+}
+
+function getWordList() {
+    var text = document.getElementById('vocabulary-input').value.trim();
+    if (!text) return [];
+    return text.split('\n')
+        .map(function(line) { return line.trim(); })
+        .filter(function(line) { return line.length > 0; });
+}
+
+function updateWordCount() {
+    var words = getWordList();
+    var countSpan = document.getElementById('word-count');
+    var submitBtn = document.getElementById('submit-batch-btn');
+
+    countSpan.textContent = words.length + ' word' + (words.length !== 1 ? 's' : '');
+
+    if (words.length > 50) {
+        countSpan.className = 'text-danger fw-bold';
+        countSpan.textContent += ' (max 50)';
+    } else if (words.length > 0) {
+        countSpan.className = 'text-success';
+    } else {
+        countSpan.className = 'text-muted';
+    }
+
+    validateForm();
+}
+
+function validateForm() {
+    var words = getWordList();
+    var targetLang = document.getElementById('target-language').value;
+    var explanationLang = document.getElementById('explanation-language').value;
+    var submitBtn = document.getElementById('submit-batch-btn');
+
+    var isValid = words.length > 0 &&
+                  words.length <= 50 &&
+                  targetLang !== '' &&
+                  explanationLang !== '' &&
+                  targetLang !== explanationLang;
+
+    submitBtn.disabled = !isValid;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Load Languages
+// ═══════════════════════════════════════════════════════════════════
+
+async function loadLanguages() {
+    try {
+        var response = await fetch('/api/v1/languages/', {
+            credentials: 'same-origin',
+            headers: { 'X-CSRFToken': getCookie('csrftoken'), 'Accept': 'application/json' },
+        });
+        var data = await response.json();
+        var languages = data.results || data;
+
+        var targetSelect = document.getElementById('target-language');
+        var explanationSelect = document.getElementById('explanation-language');
+
+        languages.forEach(function(lang) {
+            var displayName = lang.name;
+            if (lang.native_name) {
+                displayName += ' (' + lang.native_name + ')';
+            }
+
+            var hasTemplate = lang.has_template ? '' : ' [No template]';
+            targetSelect.add(new Option(displayName + hasTemplate, lang.code));
+            explanationSelect.add(new Option(displayName, lang.code));
+        });
+
+        // Set defaults from user preferences
+        var defaultTarget = '{{ user.default_target_language.code|default:"" }}';
+        var defaultExplanation = '{{ user.default_explanation_language.code|default:"" }}';
+
+        if (defaultTarget) {
+            targetSelect.value = defaultTarget;
+            selectedTargetCode = defaultTarget;
+            checkTemplate(defaultTarget);
+        }
+        if (defaultExplanation) {
+            explanationSelect.value = defaultExplanation;
+            selectedExplanationCode = defaultExplanation;
+        }
+
+        validateForm();
+
+    } catch (e) {
+        console.error('Failed to load languages:', e);
+        showBatchMessage('danger', 'Failed to load languages. Please refresh the page.');
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Check if Target Language Has a Template
+// ═══════════════════════════════════════════════════════════════════
+
+async function checkTemplate(langCode) {
+    var infoDiv = document.getElementById('template-info');
+    var infoText = document.getElementById('template-info-text');
+
+    if (!langCode) {
+        infoDiv.classList.add('d-none');
+        return;
+    }
+
+    try {
+        var response = await fetch('/api/v1/languages/' + langCode + '/', {
+            credentials: 'same-origin',
+            headers: { 'X-CSRFToken': getCookie('csrftoken'), 'Accept': 'application/json' },
+        });
+        var data = await response.json();
+
+        if (data.card_template) {
+            infoDiv.className = 'alert alert-info';
+            infoText.innerHTML = '<strong>Template found:</strong> ' +
+                data.card_template.anki_model_name +
+                ' → Deck: ' + data.card_template.default_deck_name;
+        } else {
+            infoDiv.className = 'alert alert-warning';
+            infoText.innerHTML = '<strong>Warning:</strong> No card template configured for ' +
+                data.name + '. Please contact an administrator.';
+        }
+        infoDiv.classList.remove('d-none');
+    } catch (e) {
+        infoDiv.classList.add('d-none');
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Event Listeners for Form Inputs
+// ═══════════════════════════════════════════════════════════════════
+
+document.getElementById('vocabulary-input').addEventListener('input', updateWordCount);
+
+document.getElementById('target-language').addEventListener('change', function() {
+    selectedTargetCode = this.value;
+    checkTemplate(this.value);
+    validateForm();
+});
+
+document.getElementById('explanation-language').addEventListener('change', function() {
+    selectedExplanationCode = this.value;
+    validateForm();
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// Submit Batch
+// ═══════════════════════════════════════════════════════════════════
+
+document.getElementById('submit-batch-btn').addEventListener('click', async function() {
+    var btn = this;
+    var originalHTML = '<i class="bi bi-send"></i> Generate Cards';
+    var words = getWordList();
+    var targetLang = document.getElementById('target-language').value;
+    var explanationLang = document.getElementById('explanation-language').value;
+
+    // Validation
+    if (words.length === 0) {
+        showBatchMessage('danger', 'Please enter at least one vocabulary word.');
+        return;
+    }
+    if (words.length > 50) {
+        showBatchMessage('danger', 'Maximum 50 words per batch.');
+        return;
+    }
+    if (!targetLang || !explanationLang) {
+        showBatchMessage('danger', 'Please select both languages.');
+        return;
+    }
+    if (targetLang === explanationLang) {
+        showBatchMessage('danger', 'Target and explanation language must be different.');
+        return;
+    }
+
+    // Show processing section
+    setButtonLoading(btn, true);
+    document.getElementById('batch-message').classList.add('d-none');
+    document.getElementById('results-section').classList.add('d-none');
+
+    var processingSection = document.getElementById('processing-section');
+    var progressBar = document.getElementById('progress-bar');
+    var processingStatus = document.getElementById('processing-status');
+
+    processingSection.classList.remove('d-none');
+    progressBar.style.width = '10%';
+    progressBar.textContent = '10%';
+    processingStatus.textContent = 'Submitting batch...';
+
+    try {
+        // Update progress — submitting
+        progressBar.style.width = '20%';
+        progressBar.textContent = '20%';
+        processingStatus.textContent = 'Translating vocabulary with AI...';
+
+        var response = await fetch('/api/v1/cards/batches/', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken'),
+                'Accept': 'application/json',
+            },
+            body: JSON.stringify({
+                target_language: targetLang,
+                explanation_language: explanationLang,
+                vocabulary: words,
+            }),
+        });
+
+        // Update progress — response received
+        progressBar.style.width = '90%';
+        progressBar.textContent = '90%';
+        processingStatus.textContent = 'Processing results...';
+
+        var data;
+        try {
+            var ct = response.headers.get('Content-Type') || '';
+            if (ct.indexOf('application/json') !== -1) {
+                data = await response.json();
+            } else {
+                var text = await response.text();
+                throw new Error('Server returned non-JSON response: ' + text);
+            }
+        } catch (e) {
+            // Handle parse/network errors gracefully
+            progressBar.style.width = '100%';
+            progressBar.className = 'progress-bar bg-danger';
+            processingStatus.textContent = 'Network error.';
+            showBatchMessage('danger', '<i class="bi bi-x-circle"></i> Network error: ' + e.message);
+            setButtonLoading(btn, false, originalHTML);
+            return;
+        }
+
+        // Complete progress
+        progressBar.style.width = '100%';
+        progressBar.textContent = '100%';
+        progressBar.classList.remove('progress-bar-animated');
+
+        if (response.ok || response.status === 207) {
+            currentBatchId = data.id;
+            displayResults(data);
+
+            if (data.status === 'completed') {
+                processingStatus.textContent = 'All cards generated successfully!';
+                progressBar.className = 'progress-bar bg-success';
+                showBatchMessage('success',
+                    '<i class="bi bi-check-circle"></i> All ' +
+                    data.summary.total + ' cards pushed to Anki successfully!');
+            } else if (data.status === 'partial_failure') {
+                processingStatus.textContent = 'Some cards failed.';
+                progressBar.className = 'progress-bar bg-warning';
+                showBatchMessage('warning',
+                    '<i class="bi bi-exclamation-triangle"></i> ' +
+                    data.summary.pushed + ' of ' + data.summary.total +
+                    ' cards pushed. ' + data.summary.failed + ' failed.');
+            } else {
+                processingStatus.textContent = 'Batch failed.';
+                progressBar.className = 'progress-bar bg-danger';
+                showBatchMessage('danger',
+                    '<i class="bi bi-x-circle"></i> Batch processing failed.');
+            }
+
+        } else {
+            // Server error
+            processingStatus.textContent = 'Error occurred.';
+            progressBar.className = 'progress-bar bg-danger';
+
+            var errorMsg = 'Server error. ';
+            if (data.detail) {
+                errorMsg += (typeof data.detail === 'string') ? data.detail : JSON.stringify(data.detail);
+            } else if (data.vocabulary) {
+                errorMsg += formatErrorField(data.vocabulary);
+            } else if (data.target_language) {
+                errorMsg += formatErrorField(data.target_language);
+            } else if (data.non_field_errors) {
+                errorMsg += formatErrorField(data.non_field_errors);
+            } else {
+                errorMsg += JSON.stringify(data);
+            }
+            showBatchMessage('danger', '<i class="bi bi-x-circle"></i> ' + errorMsg);
+        }
+
+    } catch (e) {
+        progressBar.style.width = '100%';
+        progressBar.className = 'progress-bar bg-danger';
+        processingStatus.textContent = 'Network error.';
+        showBatchMessage('danger', '<i class="bi bi-x-circle"></i> Network error: ' + e.message);
+    }
+
+    setButtonLoading(btn, false, originalHTML);
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// Display Results
+// ═══════════════════════════════════════════════════════════════════
+
+function displayResults(data) {
+    var resultsSection = document.getElementById('results-section');
+    var resultsHeader = document.getElementById('results-header');
+    var resultsTitle = document.getElementById('results-title');
+    var resultsSummary = document.getElementById('results-summary');
+    var resultsBody = document.getElementById('results-body');
+    var retrySection = document.getElementById('retry-section');
+    var newBatchBtn = document.getElementById('new-batch-btn');
+
+    // Set header color based on status
+    if (data.status === 'completed') {
+        resultsHeader.className = 'card-header bg-success text-white';
+        resultsTitle.innerHTML = '<i class="bi bi-check-circle"></i> Batch Complete';
+    } else if (data.status === 'partial_failure') {
+        resultsHeader.className = 'card-header bg-warning';
+        resultsTitle.innerHTML = '<i class="bi bi-exclamation-triangle"></i> Partial Success';
+    } else {
+        resultsHeader.className = 'card-header bg-danger text-white';
+        resultsTitle.innerHTML = '<i class="bi bi-x-circle"></i> Batch Failed';
+    }
+
+    // Summary badges
+    var summary = data.summary || { total: 0, pushed: 0, failed: 0, pending: 0 };
+    resultsSummary.innerHTML =
+        '<span class="badge bg-secondary me-2">Total: ' + summary.total + '</span>' +
+        '<span class="badge bg-success me-2">Pushed: ' + summary.pushed + '</span>' +
+        '<span class="badge bg-danger me-2">Failed: ' + summary.failed + '</span>';
+
+    if (summary.pending > 0) {
+        resultsSummary.innerHTML += '<span class="badge bg-info me-2">Pending: ' + summary.pending + '</span>';
+    }
+
+    // Build results table rows
+    resultsBody.innerHTML = '';
+    var cards = data.cards || [];
+
+    cards.forEach(function(card, index) {
+        var row = document.createElement('tr');
+
+        // Row color based on status
+        if (card.status === 'pushed') {
+            row.className = 'table-success';
+        } else if (card.status === 'failed') {
+            row.className = 'table-danger';
+        } else {
+            row.className = 'table-warning';
+        }
+
+        // Status badge
+        var statusBadge = '';
+        if (card.status === 'pushed') {
+            statusBadge = '<span class="badge bg-success"><i class="bi bi-check"></i> OK</span>';
+        } else if (card.status === 'failed') {
+            statusBadge = '<span class="badge bg-danger" title="' +
+                escapeHtml(card.error_message || '') +
+                '"><i class="bi bi-x"></i> Failed</span>';
+        } else {
+            statusBadge = '<span class="badge bg-warning"><i class="bi bi-clock"></i> ' +
+                card.status + '</span>';
+        }
+
+        row.innerHTML =
+            '<td>' + (index + 1) + '</td>' +
+            '<td>' + escapeHtml(card.input_text) + '</td>' +
+            '<td>' + escapeHtml(card.target_word || '-') + '</td>' +
+            '<td>' + escapeHtml(card.explanation_word || '-') + '</td>' +
+            '<td>' + statusBadge + '</td>';
+
+        resultsBody.appendChild(row);
+    });
+
+    // Show retry button if there are failed cards
+    if (summary.failed > 0) {
+        retrySection.classList.remove('d-none');
+    } else {
+        retrySection.classList.add('d-none');
+    }
+
+    // Show new batch button
+    newBatchBtn.style.display = 'inline-block';
+
+    // Show results section
+    resultsSection.classList.remove('d-none');
+
+    // Scroll to results
+    resultsSection.scrollIntoView({ behavior: 'smooth' });
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Escape HTML (prevent XSS)
+// ═══════════════════════════════════════════════════════════════════
+
+function escapeHtml(text) {
+    if (!text) return '';
+    var div = document.createElement('div');
+    div.appendChild(document.createTextNode(text));
+    return div.innerHTML;
+}
+
+function formatErrorField(field) {
+    if (!field) return '';
+    if (Array.isArray(field)) return field.join(' ');
+    if (typeof field === 'string') return field;
+    try { return JSON.stringify(field); } catch (e) { return String(field); }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Retry Failed Cards
+// ═══════════════════════════════════════════════════════════════════
+
+document.getElementById('retry-btn').addEventListener('click', async function() {
+    if (!currentBatchId) return;
+
+    var btn = this;
+    var originalHTML = '<i class="bi bi-arrow-repeat"></i> Retry Failed Cards';
+    setButtonLoading(btn, true);
+
+    var processingSection = document.getElementById('processing-section');
+    var progressBar = document.getElementById('progress-bar');
+    var processingStatus = document.getElementById('processing-status');
+
+    // Reset progress bar
+    processingSection.classList.remove('d-none');
+    progressBar.style.width = '0%';
+    progressBar.textContent = '0%';
+    progressBar.className = 'progress-bar progress-bar-striped progress-bar-animated';
+    processingStatus.textContent = 'Retrying failed cards...';
+
+    try {
+        progressBar.style.width = '30%';
+        progressBar.textContent = '30%';
+
+        var response = await fetch('/api/v1/cards/batches/' + currentBatchId + '/retry/', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken'),
+                'Accept': 'application/json',
+            },
+        });
+
+        progressBar.style.width = '90%';
+        progressBar.textContent = '90%';
+
+        var data;
+        try {
+            var ct = response.headers.get('Content-Type') || '';
+            if (ct.indexOf('application/json') !== -1) {
+                data = await response.json();
+            } else {
+                var text = await response.text();
+                throw new Error('Server returned non-JSON response: ' + text);
+            }
+        } catch (e) {
+            progressBar.style.width = '100%';
+            progressBar.className = 'progress-bar bg-danger';
+            processingStatus.textContent = 'Network error.';
+            showBatchMessage('danger', '<i class="bi bi-x-circle"></i> Network error: ' + e.message);
+            setButtonLoading(btn, false, originalHTML);
+            return;
+        }
+
+        progressBar.style.width = '100%';
+        progressBar.textContent = '100%';
+        progressBar.classList.remove('progress-bar-animated');
+
+        if (response.ok) {
+            displayResults(data);
+
+            if (data.status === 'completed') {
+                progressBar.className = 'progress-bar bg-success';
+                processingStatus.textContent = 'All cards pushed successfully!';
+                showBatchMessage('success',
+                    '<i class="bi bi-check-circle"></i> Retry successful! All cards pushed.');
+            } else if (data.status === 'partial_failure') {
+                progressBar.className = 'progress-bar bg-warning';
+                processingStatus.textContent = 'Some cards still failing.';
+                showBatchMessage('warning',
+                    '<i class="bi bi-exclamation-triangle"></i> Some cards still failed after retry.');
+            } else {
+                progressBar.className = 'progress-bar bg-danger';
+                processingStatus.textContent = 'Retry failed.';
+                showBatchMessage('danger', '<i class="bi bi-x-circle"></i> Retry failed.');
+            }
+
+        } else {
+            progressBar.className = 'progress-bar bg-danger';
+            processingStatus.textContent = 'Retry error.';
+            showBatchMessage('danger', '<i class="bi bi-x-circle"></i> ' + (data.error || data.message || 'Retry failed.'));
+        }
+
+    } catch (e) {
+        progressBar.style.width = '100%';
+        progressBar.className = 'progress-bar bg-danger';
+        processingStatus.textContent = 'Network error.';
+        showBatchMessage('danger', '<i class="bi bi-x-circle"></i> Network error: ' + e.message);
+    }
+
+    setButtonLoading(btn, false, originalHTML);
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// New Batch Button — Reset Form
+// ═══════════════════════════════════════════════════════════════════
+
+document.getElementById('new-batch-btn').addEventListener('click', function() {
+    // Clear input
+    document.getElementById('vocabulary-input').value = '';
+    updateWordCount();
+
+    // Hide results and processing
+    document.getElementById('results-section').classList.add('d-none');
+    document.getElementById('processing-section').classList.add('d-none');
+    document.getElementById('batch-message').classList.add('d-none');
+
+    // Hide new batch button
+    this.style.display = 'none';
+
+    // Reset progress bar
+    var progressBar = document.getElementById('progress-bar');
+    progressBar.style.width = '0%';
+    progressBar.textContent = '0%';
+    progressBar.className = 'progress-bar progress-bar-striped progress-bar-animated';
+
+    // Reset state
+    currentBatchId = null;
+
+    // Scroll to top
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    // Focus on textarea
+    document.getElementById('vocabulary-input').focus();
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// Initialize on Page Load
+// ═══════════════════════════════════════════════════════════════════
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadLanguages();
+    updateWordCount();
+});
+
+</script>
+
+{% endblock %}

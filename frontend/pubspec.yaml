@@ -1,0 +1,13 @@
+name: anki_vocab_frontend
+description: Minimal placeholder Flutter frontend for anki-vocab-builder
+version: 0.0.1
+environment:
+  sdk: '>=2.17.0 <4.0.0'
+dependencies:
+  flutter:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/

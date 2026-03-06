@@ -1,0 +1,694 @@
+{% extends 'base.html' %}
+
+{% block title %}Batch Detail — Anki Vocab Builder{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-10">
+
+    <!-- ── Back Button & Title ── -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <div>
+        <a href="{% url 'cards-web:batch-list' %}" class="btn btn-outline-secondary btn-sm mb-2">
+          <i class="bi bi-arrow-left"></i> Back to History
+        </a>
+        <h2 id="batch-title">
+          <span class="spinner-border spinner-border-sm"></span> Loading batch...
+        </h2>
+      </div>
+      <div id="action-buttons" class="d-none">
+        <button class="btn btn-warning d-none" id="retry-btn">
+          <i class="bi bi-arrow-repeat"></i> Retry Failed
+        </button>
+        <a href="{% url 'cards-web:batch-create' %}" class="btn btn-primary">
+          <i class="bi bi-plus-circle"></i> New Batch
+        </a>
+      </div>
+    </div>
+
+    <!-- ── Status Message ── -->
+    <div id="detail-message" class="alert d-none"></div>
+
+    <!-- ── Loading Spinner ── -->
+    <div id="loading-spinner" class="text-center py-5">
+      <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
+        <span class="visually-hidden">Loading...</span>
+      </div>
+      <p class="text-muted mt-3">Loading batch details...</p>
+    </div>
+
+    <!-- ── Error State ── -->
+    <div id="error-state" class="text-center py-5 d-none">
+      <i class="bi bi-exclamation-triangle" style="font-size: 4rem; color: #dc3545;"></i>
+      <h4 class="text-muted mt-3" id="error-title">Batch not found</h4>
+      <p class="text-muted" id="error-text">The batch you are looking for does not exist.</p>
+      <a href="{% url 'cards-web:batch-list' %}" class="btn btn-primary">
+        <i class="bi bi-arrow-left"></i> Back to History
+      </a>
+    </div>
+
+    <!-- ═══════════════════════════════════════════ -->
+    <!-- Batch Info Section                          -->
+    <!-- ═══════════════════════════════════════════ -->
+    <div id="batch-info-section" class="d-none">
+
+      <!-- Batch Summary Card -->
+      <div class="card shadow-sm mb-4">
+        <div class="card-header" id="summary-header">
+          <h5 class="mb-0" id="summary-title"></h5>
+        </div>
+        <div class="card-body">
+          <div class="row">
+            <!-- Left: Batch Info -->
+            <div class="col-md-6">
+              <table class="table table-borderless table-sm mb-0">
+                <tr>
+                  <th style="width:160px;">Batch ID</th>
+                  <td id="info-id"></td>
+                </tr>
+                <tr>
+                  <th>Target Language</th>
+                  <td id="info-target-lang"></td>
+                </tr>
+                <tr>
+                  <th>Explanation Language</th>
+                  <td id="info-explanation-lang"></td>
+                </tr>
+                <tr>
+                  <th>Created</th>
+                  <td id="info-created"></td>
+                </tr>
+                <tr>
+                  <th>Last Updated</th>
+                  <td id="info-updated"></td>
+                </tr>
+              </table>
+            </div>
+
+            <!-- Right: Stats -->
+            <div class="col-md-6">
+              <div class="row text-center">
+                <div class="col-4">
+                  <div class="card bg-light">
+                    <div class="card-body py-3">
+                      <h3 class="mb-0" id="stat-total">0</h3>
+                      <small class="text-muted">Total</small>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-4">
+                  <div class="card bg-success bg-opacity-10">
+                    <div class="card-body py-3">
+                      <h3 class="mb-0 text-success" id="stat-pushed">0</h3>
+                      <small class="text-muted">Pushed</small>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-4">
+                  <div class="card bg-danger bg-opacity-10">
+                    <div class="card-body py-3">
+                      <h3 class="mb-0 text-danger" id="stat-failed">0</h3>
+                      <small class="text-muted">Failed</small>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Progress Bar -->
+              <div class="progress mt-3" style="height: 20px;">
+                <div id="stat-progress-success"
+                   class="progress-bar bg-success"
+                   role="progressbar"
+                   style="width: 0%">
+                </div>
+                <div id="stat-progress-fail"
+                   class="progress-bar bg-danger"
+                   role="progressbar"
+                   style="width: 0%">
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══════════════════════════════════════════ -->
+      <!-- Raw Input Card                              -->
+      <!-- ═══════════════════════════════════════════ -->
+      <div class="card shadow-sm mb-4">
+        <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
+          <h5 class="mb-0"><i class="bi bi-text-left"></i> Original Input</h5>
+          <button class="btn btn-sm btn-outline-light" type="button"
+              data-bs-toggle="collapse" data-bs-target="#raw-input-collapse">
+            <i class="bi bi-chevron-down"></i> Toggle
+          </button>
+        </div>
+        <div class="collapse" id="raw-input-collapse">
+          <div class="card-body">
+            <pre id="raw-input-text" class="mb-0"
+               style="white-space: pre-wrap; font-size: 0.9rem;"></pre>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══════════════════════════════════════════ -->
+      <!-- Cards Table                                 -->
+      <!-- ═══════════════════════════════════════════ -->
+      <div class="card shadow-sm mb-4">
+        <div class="card-header bg-primary text-white">
+          <h5 class="mb-0"><i class="bi bi-card-list"></i> Vocabulary Cards</h5>
+        </div>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-hover mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th style="width:40px;">#</th>
+                  <th>Input</th>
+                  <th>Target Word</th>
+                  <th>Translation</th>
+                  <th style="width:100px;">Status</th>
+                  <th style="width:60px;">Detail</th>
+                </tr>
+              </thead>
+              <tbody id="cards-body">
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ═══════════════════════════════════════════ -->
+    <!-- Card Detail Modal                           -->
+    <!-- ═══════════════════════════════════════════ -->
+    <div class="modal fade" id="cardDetailModal" tabindex="-1">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="modal-title">Card Detail</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <!-- Loading -->
+            <div id="modal-loading" class="text-center py-4">
+              <div class="spinner-border text-primary"></div>
+              <p class="text-muted mt-2">Loading card details...</p>
+            </div>
+
+            <!-- Card Content -->
+            <div id="modal-content" class="d-none">
+              <table class="table table-bordered">
+                <tr class="table-primary">
+                  <th style="width:220px;">Target Word</th>
+                  <td id="modal-target-word" class="fw-bold fs-5"></td>
+                </tr>
+                <tr>
+                  <th>Translation</th>
+                  <td id="modal-explanation-word"></td>
+                </tr>
+                <tr>
+                  <th>Synonyme</th>
+                  <td id="modal-synonyme"></td>
+                </tr>
+                <tr>
+                  <th>Conjugaison / Genre</th>
+                  <td id="modal-conjugaison" style="white-space: pre-wrap;"></td>
+                </tr>
+                <tr>
+                  <th>Audio</th>
+                  <td id="modal-audio"></td>
+                </tr>
+                <tr class="table-light">
+                  <th>Example 1 (Target)</th>
+                  <td id="modal-exemple-target" class="fst-italic"></td>
+                </tr>
+                <tr class="table-light">
+                  <th>Example 1 (Translation)</th>
+                  <td id="modal-exemple-explanation"></td>
+                </tr>
+                <tr class="table-light">
+                  <th>Example 1 Audio</th>
+                  <td id="modal-exemple1-audio"></td>
+                </tr>
+                <tr>
+                  <th>Example 2 (Target)</th>
+                  <td id="modal-exemple2-target" class="fst-italic"></td>
+                </tr>
+                <tr>
+                  <th>Example 2 (Translation)</th>
+                  <td id="modal-exemple2-explanation"></td>
+                </tr>
+                <tr>
+                  <th>Example 2 Audio</th>
+                  <td id="modal-exemple2-audio"></td>
+                </tr>
+                <tr class="table-info">
+                  <th>Extend</th>
+                  <td id="modal-extend" style="white-space: pre-wrap;"></td>
+                </tr>
+                <tr class="table-warning">
+                  <th>Hint</th>
+                  <td id="modal-hint"></td>
+                </tr>
+                <tr>
+                  <th>Status</th>
+                  <td id="modal-status"></td>
+                </tr>
+                <tr>
+                  <th>Anki Note ID</th>
+                  <td id="modal-note-id"></td>
+                </tr>
+                <tr id="modal-error-row" class="d-none table-danger">
+                  <th>Error</th>
+                  <td id="modal-error"></td>
+                </tr>
+              </table>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// ═══════════════════════════════════════════════════
+// State
+// ═══════════════════════════════════════════════════
+
+var batchId = null;
+
+// ═══════════════════════════════════════════════════
+// Utility Functions
+// ═══════════════════════════════════════════════════
+
+function getCookie(name) {
+  var value = null;
+  document.cookie.split(';').forEach(function(c) {
+    c = c.trim();
+    if (c.startsWith(name + '=')) {
+      value = c.substring(name.length + 1);
+    }
+  });
+  return value;
+}
+
+function escapeHtml(text) {
+  if (!text) return '';
+  var div = document.createElement('div');
+  div.appendChild(document.createTextNode(text));
+  return div.innerHTML;
+}
+
+function formatDate(dateString) {
+  if (!dateString) return '-';
+  var date = new Date(dateString);
+  var year = date.getFullYear();
+  var month = String(date.getMonth() + 1).padStart(2, '0');
+  var day = String(date.getDate()).padStart(2, '0');
+  var hours = String(date.getHours()).padStart(2, '0');
+  var minutes = String(date.getMinutes()).padStart(2, '0');
+  var seconds = String(date.getSeconds()).padStart(2, '0');
+  return year + '-' + month + '-' + day + ' ' + hours + ':' + minutes + ':' + seconds;
+}
+
+function getStatusBadge(status) {
+  var badges = {
+    'completed': '<span class="badge bg-success"><i class="bi bi-check-circle"></i> Completed</span>',
+    'partial_failure': '<span class="badge bg-warning text-dark"><i class="bi bi-exclamation-triangle"></i> Partial Failure</span>',
+    'failed': '<span class="badge bg-danger"><i class="bi bi-x-circle"></i> Failed</span>',
+    'pending': '<span class="badge bg-info"><i class="bi bi-clock"></i> Pending</span>',
+    'translated': '<span class="badge bg-info"><i class="bi bi-translate"></i> Translated</span>',
+    'tts_done': '<span class="badge bg-info"><i class="bi bi-volume-up"></i> TTS Done</span>',
+    'pushed': '<span class="badge bg-success"><i class="bi bi-check-circle"></i> Pushed</span>',
+  };
+  return badges[status] || '<span class="badge bg-secondary">' + escapeHtml(status) + '</span>';
+}
+
+function showDetailMessage(type, text) {
+  var div = document.getElementById('detail-message');
+  div.className = 'alert alert-' + type + ' alert-dismissible fade show';
+  div.innerHTML = text +
+    '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
+  div.classList.remove('d-none');
+}
+
+// ═══════════════════════════════════════════════════
+// Extract Batch ID from URL
+// ═══════════════════════════════════════════════════
+
+function getBatchIdFromUrl() {
+  // URL pattern: /cards/batches/42/
+  var parts = window.location.pathname.split('/');
+  for (var i = 0; i < parts.length; i++) {
+    if (parts[i] === 'batches' && parts[i + 1]) {
+      var id = parseInt(parts[i + 1]);
+      if (!isNaN(id)) return id;
+    }
+  }
+  return null;
+}
+
+// ═══════════════════════════════════════════════════
+// Build Audio Player HTML
+// ═══════════════════════════════════════════════════
+
+function buildAudioPlayer(filePath) {
+  if (!filePath) return '<span class="text-muted">No audio</span>';
+  var url = '/media/' + filePath;
+  return '<audio controls preload="none" style="height:30px; max-width:250px;">' +
+       '<source src="' + escapeHtml(url) + '" type="audio/mpeg">' +
+       'Your browser does not support audio.' +
+       '</audio>';
+}
+
+// ═══════════════════════════════════════════════════
+// Load Batch Details
+// ═══════════════════════════════════════════════════
+
+async function loadBatchDetail() {
+  var loadingSpinner = document.getElementById('loading-spinner');
+  var errorState = document.getElementById('error-state');
+  var batchInfoSection = document.getElementById('batch-info-section');
+  var actionButtons = document.getElementById('action-buttons');
+
+  // Get batch ID from URL
+  batchId = getBatchIdFromUrl();
+
+  if (!batchId) {
+    loadingSpinner.classList.add('d-none');
+    errorState.classList.remove('d-none');
+    document.getElementById('error-title').textContent = 'Invalid batch ID';
+    document.getElementById('error-text').textContent = 'Could not find a valid batch ID in the URL.';
+    return;
+  }
+
+  try {
+    var response = await fetch('/api/v1/cards/batches/' + batchId + '/', {
+      headers: { 'X-CSRFToken': getCookie('csrftoken') },
+    });
+
+    // Hide loading
+    loadingSpinner.classList.add('d-none');
+
+    if (response.status === 404) {
+      errorState.classList.remove('d-none');
+      document.getElementById('error-title').textContent = 'Batch not found';
+      document.getElementById('error-text').textContent = 'Batch #' + batchId + ' does not exist or you do not have access.';
+      return;
+    }
+
+    if (!response.ok) {
+      throw new Error('Server returned ' + response.status);
+    }
+
+    var data = await response.json();
+
+    // Show batch info
+    batchInfoSection.classList.remove('d-none');
+    actionButtons.classList.remove('d-none');
+
+    // Populate batch info
+    populateBatchInfo(data);
+
+    // Populate cards table
+    populateCardsTable(data.cards || []);
+
+    // Show retry button if there are failed cards
+    var summary = data.summary || {};
+    if (summary.failed > 0) {
+      document.getElementById('retry-btn').classList.remove('d-none');
+    }
+
+  } catch (e) {
+    loadingSpinner.classList.add('d-none');
+    errorState.classList.remove('d-none');
+    document.getElementById('error-title').textContent = 'Error loading batch';
+    document.getElementById('error-text').textContent = e.message;
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// Populate Batch Info
+// ═══════════════════════════════════════════════════
+
+function populateBatchInfo(data) {
+  // Title
+  document.getElementById('batch-title').innerHTML =
+    '<i class="bi bi-card-list"></i> Batch #' + data.id;
+
+  // Summary header
+  var summaryHeader = document.getElementById('summary-header');
+  var summaryTitle = document.getElementById('summary-title');
+
+  if (data.status === 'completed') {
+    summaryHeader.className = 'card-header bg-success text-white';
+    summaryTitle.innerHTML = '<i class="bi bi-check-circle"></i> Batch Completed';
+  } else if (data.status === 'partial_failure') {
+    summaryHeader.className = 'card-header bg-warning';
+    summaryTitle.innerHTML = '<i class="bi bi-exclamation-triangle"></i> Partial Failure';
+  } else if (data.status === 'failed') {
+    summaryHeader.className = 'card-header bg-danger text-white';
+    summaryTitle.innerHTML = '<i class="bi bi-x-circle"></i> Batch Failed';
+  } else {
+    summaryHeader.className = 'card-header bg-info text-white';
+    summaryTitle.innerHTML = '<i class="bi bi-clock"></i> ' + escapeHtml(data.status);
+  }
+
+  // Info table
+  document.getElementById('info-id').textContent = '#' + data.id;
+  document.getElementById('info-target-lang').textContent = data.target_language_name || '-';
+  document.getElementById('info-explanation-lang').textContent = data.explanation_language_name || '-';
+  document.getElementById('info-created').textContent = formatDate(data.created_at);
+  document.getElementById('info-updated').textContent = formatDate(data.updated_at);
+
+  // Stats
+  var summary = data.summary || { total: 0, pushed: 0, failed: 0 };
+  document.getElementById('stat-total').textContent = summary.total;
+  document.getElementById('stat-pushed').textContent = summary.pushed;
+  document.getElementById('stat-failed').textContent = summary.failed;
+
+  // Progress bar
+  var total = summary.total || 1;
+  var successPercent = Math.round((summary.pushed / total) * 100);
+  var failPercent = Math.round((summary.failed / total) * 100);
+
+  document.getElementById('stat-progress-success').style.width = successPercent + '%';
+  document.getElementById('stat-progress-success').textContent =
+    successPercent > 10 ? successPercent + '%' : '';
+
+  document.getElementById('stat-progress-fail').style.width = failPercent + '%';
+  document.getElementById('stat-progress-fail').textContent =
+    failPercent > 10 ? failPercent + '%' : '';
+
+  // Raw input
+  document.getElementById('raw-input-text').textContent = data.raw_input || '';
+}
+
+// ═══════════════════════════════════════════════════
+// Populate Cards Table
+// ═══════════════════════════════════════════════════
+
+function populateCardsTable(cards) {
+  var tbody = document.getElementById('cards-body');
+  tbody.innerHTML = '';
+
+  if (cards.length === 0) {
+    tbody.innerHTML =
+      '<tr><td colspan="6" class="text-center text-muted py-4">No cards in this batch.</td></tr>';
+    return;
+  }
+
+  cards.forEach(function(card, index) {
+    var row = document.createElement('tr');
+
+    // Row color based on status
+    if (card.status === 'pushed') {
+      row.className = 'table-success';
+    } else if (card.status === 'failed') {
+      row.className = 'table-danger';
+    } else {
+      row.className = 'table-warning';
+    }
+
+    // Error tooltip for failed cards
+    var errorTitle = '';
+    if (card.status === 'failed' && card.error_message) {
+      errorTitle = ' title="' + escapeHtml(card.error_message) + '"';
+    }
+
+    row.innerHTML =
+      '<td>' + (index + 1) + '</td>' +
+      '<td>' + escapeHtml(card.input_text) + '</td>' +
+      '<td><strong>' + escapeHtml(card.target_word || '-') + '</strong></td>' +
+      '<td>' + escapeHtml(card.explanation_word || '-') + '</td>' +
+      '<td' + errorTitle + '>' + getStatusBadge(card.status) + '</td>' +
+      '<td>' +
+        '<button class="btn btn-sm btn-outline-primary view-card-btn" ' +
+        'data-card-id="' + card.id + '" title="View full card">' +
+          '<i class="bi bi-eye"></i>' +
+        '</button>' +
+      '</td>';
+
+    tbody.appendChild(row);
+  });
+
+  // Attach click listeners to view buttons
+  document.querySelectorAll('.view-card-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var cardId = this.getAttribute('data-card-id');
+      loadCardDetail(cardId);
+    });
+  });
+}
+
+// ═══════════════════════════════════════════════════
+// Load Card Detail (Modal)
+// ═════════════════════════════════════════════════════════
+function loadCardDetail(cardId) {
+  var modalEl = document.getElementById('cardDetailModal');
+  var modal = new bootstrap.Modal(modalEl);
+
+  // show loading
+  document.getElementById('modal-loading').classList.remove('d-none');
+  document.getElementById('modal-content').classList.add('d-none');
+  document.getElementById('modal-error-row').classList.add('d-none');
+  modal.show();
+
+  // Attempt to fetch card detail; handle auth / network errors gracefully
+  fetch('/api/v1/cards/cards/' + cardId + '/', {
+    headers: { 'X-CSRFToken': getCookie('csrftoken') },
+    credentials: 'same-origin'
+  }).then(function(resp) {
+    if (resp.status === 401 || resp.status === 403) {
+      throw new Error('Authentication required. Please log in.');
+    }
+    if (!resp.ok) throw new Error('Card detail not available (status ' + resp.status + ')');
+    return resp.json();
+  }).then(function(data) {
+    document.getElementById('modal-loading').classList.add('d-none');
+    document.getElementById('modal-content').classList.remove('d-none');
+
+    // Defensive mapping: use several possible field names
+    var get = function(obj, keys, fallback) {
+      for (var i=0;i<keys.length;i++) if (obj && obj[keys[i]] !== undefined) return obj[keys[i]];
+      return fallback || '';
+    };
+
+    document.getElementById('modal-title').textContent = 'Card #' + get(data, ['id','card_id'], '-');
+    document.getElementById('modal-target-word').textContent = get(data, ['target_word','word','target'], '-') || '-';
+    document.getElementById('modal-explanation-word').textContent = get(data, ['explanation_word','explanation'], '-') || '-';
+    document.getElementById('modal-synonyme').textContent = get(data, ['synonyme','synonym'], '-') || '-';
+    document.getElementById('modal-conjugaison').textContent = get(data, ['conjugaison','conjugation','notes'], '-') || '-';
+    document.getElementById('modal-audio').innerHTML = buildAudioPlayer(get(data, ['word_audio','audio','word_audio_path']));
+    document.getElementById('modal-exemple-target').textContent = get(data, ['example_target','example1_target','examples[0]'], '');
+    document.getElementById('modal-exemple-explanation').textContent = get(data, ['example_explanation','example1_explanation','examples[0].translation'], '');
+    document.getElementById('modal-exemple1-audio').innerHTML = buildAudioPlayer(get(data, ['example1_audio','examples[0].audio']));
+    document.getElementById('modal-exemple2-target').textContent = get(data, ['example2_target','example2_target'], '');
+    document.getElementById('modal-exemple2-explanation').textContent = get(data, ['example2_explanation','example2_translation'], '');
+    document.getElementById('modal-exemple2-audio').innerHTML = buildAudioPlayer(get(data, ['example2_audio','examples[1].audio']));
+    document.getElementById('modal-extend').textContent = get(data, ['extend','extra'], '');
+    document.getElementById('modal-hint').textContent = get(data, ['hint','note'], '');
+    document.getElementById('modal-status').innerHTML = getStatusBadge(get(data, ['status'], ''));
+    document.getElementById('modal-note-id').textContent = get(data, ['note_id','anki_note_id'], '');
+    if (get(data, ['error_message','error'], '')) {
+      document.getElementById('modal-error-row').classList.remove('d-none');
+      document.getElementById('modal-error').textContent = get(data, ['error_message','error']);
+    }
+  }).catch(function(err) {
+    document.getElementById('modal-loading').classList.add('d-none');
+    document.getElementById('modal-content').classList.add('d-none');
+    document.getElementById('modal-error-row').classList.remove('d-none');
+    document.getElementById('modal-error').textContent = err.message || String(err);
+  });
+}
+
+// Retry handler — sends a POST to backend retry endpoint and shows feedback
+function retryFailed() {
+  if (!batchId) return showDetailMessage('warning', 'Batch ID unknown');
+  var url = '/api/v1/cards/batches/' + batchId + '/retry/';
+  showDetailMessage('info', 'Sending retry request...');
+
+  fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+    credentials: 'same-origin',
+  }).then(function(resp) {
+    if (resp.status === 404) throw new Error('Retry endpoint not available on server');
+    if (resp.status === 403 || resp.status === 401) throw new Error('Authentication required');
+    if (resp.status === 202) {
+      return resp.json();
+    }
+    if (!resp.ok) throw new Error('Retry failed: ' + resp.status);
+    return resp.json();
+  }).then(function(data) {
+    showDetailMessage('success', 'Retry started. The server is processing failed cards.');
+    // Disable retry button while processing
+    var retryBtn = document.getElementById('retry-btn');
+    if (retryBtn) {
+      retryBtn.classList.add('disabled');
+      retryBtn.setAttribute('aria-disabled', 'true');
+    }
+
+    // Poll the batch endpoint for progress
+    var attempts = 0;
+    var maxAttempts = 12; // ~24 seconds
+    var pollInterval = 2000;
+    var pollId = setInterval(async function() {
+      attempts += 1;
+      try {
+        var r = await fetch('/api/v1/cards/batches/' + batchId + '/', { headers: { 'X-CSRFToken': getCookie('csrftoken') }, credentials: 'same-origin' });
+        if (!r.ok) {
+          throw new Error('Status ' + r.status);
+        }
+        var d = await r.json();
+        // Update UI with fresh data
+        populateBatchInfo(d);
+        populateCardsTable(d.cards || []);
+
+        var summary = d.summary || {};
+        // Stop polling when no failed cards remain or batch is not pending
+        if ((summary.failed === 0 && (summary.total === summary.pushed)) || d.status === 'completed' || d.status === 'partial_failure' || attempts >= maxAttempts) {
+          clearInterval(pollId);
+          if (retryBtn) {
+            retryBtn.classList.add('d-none');
+            retryBtn.classList.remove('disabled');
+            retryBtn.removeAttribute('aria-disabled');
+          }
+          if (summary.failed === 0) {
+            showDetailMessage('success', 'Retry completed — no failed cards remain.');
+          } else if (d.status === 'partial_failure') {
+            showDetailMessage('warning', 'Retry finished with partial failures.');
+          } else if (attempts >= maxAttempts) {
+            showDetailMessage('info', 'Retry still in progress; refresh the page to continue monitoring.');
+          }
+        }
+      } catch (err) {
+        clearInterval(pollId);
+        if (retryBtn) retryBtn.classList.remove('disabled');
+        showDetailMessage('danger', 'Error polling retry status: ' + (err.message || String(err)));
+      }
+    }, pollInterval);
+
+  }).catch(function(err) {
+    showDetailMessage('danger', 'Retry failed: ' + (err.message || String(err)));
+  });
+}
+
+// Initialize
+document.addEventListener('DOMContentLoaded', function() {
+  loadBatchDetail();
+  var retryBtn = document.getElementById('retry-btn');
+  if (retryBtn) retryBtn.addEventListener('click', retryFailed);
+});
+
+</script>
+{% endblock %}

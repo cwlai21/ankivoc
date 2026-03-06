@@ -1,0 +1,272 @@
+{% extends 'base.html' %}
+
+{% block title %}Profile — Anki Vocab Builder{% endblock %}
+
+{% block content %}
+
+<div class="row justify-content-center">
+
+    <div class="col-md-8">
+
+        <h2 class="mb-4"><i class="bi bi-person-circle"></i> Profile Settings</h2>
+
+        <div id="profile-message" class="alert d-none"></div>
+
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-plug"></i> AnkiConnect Settings</h5>
+            </div>
+            <div class="card-body">
+                <form id="anki-settings-form">
+                    <div class="mb-3">
+                        <label for="anki-url" class="form-label">AnkiConnect URL</label>
+                        <input type="url"
+                               id="anki-url"
+                               class="form-control"
+                               value="{{ user.anki_connect_url }}"
+                               placeholder="http://localhost:8765">
+                        <div class="form-text">
+                            Anki desktop must be open with the AnkiConnect add-on installed.
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="anki-api-key" class="form-label">API Key (optional)</label>
+                        <input type="text"
+                               id="anki-api-key"
+                               class="form-control"
+                               value="{{ user.anki_connect_api_key }}"
+                               placeholder="Leave blank if not configured">
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary" id="save-anki-btn">
+                            <i class="bi bi-save"></i> Save
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" id="test-anki-btn">
+                            <i class="bi bi-lightning"></i> Test Connection
+                        </button>
+                    </div>
+                </form>
+
+                <div id="anki-test-result" class="mt-3 d-none"></div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0"><i class="bi bi-translate"></i> Language Preferences</h5>
+            </div>
+            <div class="card-body">
+                <form id="lang-settings-form">
+                    <div class="mb-3">
+                        <label for="target-lang" class="form-label">Default Target Language</label>
+                        <select id="target-lang" class="form-select">
+                            <option value="">-- Select --</option>
+                        </select>
+                        <div class="form-text">The language you want to learn</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="explanation-lang" class="form-label">Default Explanation Language</label>
+                        <select id="explanation-lang" class="form-select">
+                            <option value="">-- Select --</option>
+                        </select>
+                        <div class="form-text">The language used for translations</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="deck-name" class="form-label">Default Deck Name</label>
+                        <input type="text"
+                               id="deck-name"
+                               class="form-control"
+                               value="{{ user.default_deck_name }}"
+                               placeholder="e.g. French::Vocabulary">
+                    </div>
+
+                    <button type="submit" class="btn btn-success" id="save-lang-btn">
+                        <i class="bi bi-save"></i> Save Preferences
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-warning">
+                <h5 class="mb-0"><i class="bi bi-shield-lock"></i> Change Password</h5>
+            </div>
+            <div class="card-body">
+                <form id="password-form">
+                    <div class="mb-3">
+                        <label for="old-password" class="form-label">Current Password</label>
+                        <input type="password" id="old-password" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="new-password" class="form-label">New Password</label>
+                        <input type="password" id="new-password" class="form-control" minlength="8" required>
+                        <div class="form-text">Minimum 8 characters</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="new-password-confirm" class="form-label">Confirm New Password</label>
+                        <input type="password" id="new-password-confirm" class="form-control" minlength="8" required>
+                    </div>
+                    <button type="submit" class="btn btn-warning" id="change-pass-btn">
+                        <i class="bi bi-key"></i> Change Password
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-secondary text-white">
+                <h5 class="mb-0"><i class="bi bi-info-circle"></i> Account Info</h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-borderless mb-0">
+                    <tr>
+                        <th style="width:200px;">Username</th>
+                        <td>{{ user.username }}</td>
+                    </tr>
+                    <tr>
+                        <th>Email</th>
+                        <td>{{ user.email|default:"Not set" }}</td>
+                    </tr>
+                    <tr>
+                        <th>Member Since</th>
+                        <td>{{ user.date_joined|date:"F j, Y" }}</td>
+                    </tr>
+                    <tr>
+                        <th>Total Batches</th>
+                        <td>{{ user.batches.count }}</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+
+<script>
+function getCookie(name) {
+    var value = null;
+    document.cookie.split(';').forEach(function(c) {
+        c = c.trim();
+        if (c.startsWith(name + '=')) {
+            value = c.substring(name.length + 1);
+        }
+    });
+    return value;
+}
+
+function showMessage(type, text) {
+    var div = document.getElementById('profile-message');
+    div.className = 'alert alert-' + type + ' alert-dismissible fade show';
+    div.innerHTML = text + '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
+    div.classList.remove('d-none');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setTimeout(function() { div.classList.add('d-none'); }, 5000);
+}
+
+function setButtonLoading(btn, loading, originalHTML) {
+    if (loading) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Processing...';
+    } else {
+        btn.disabled = false;
+        btn.innerHTML = originalHTML;
+    }
+}
+
+async function loadLanguages() {
+    try {
+        var response = await fetch('/api/v1/languages/', { credentials: 'same-origin', headers: { 'X-CSRFToken': getCookie('csrftoken'), 'Accept': 'application/json' }, });
+        var data = await response.json();
+        var languages = data.results || data;
+
+        var targetSelect = document.getElementById('target-lang');
+        var explanationSelect = document.getElementById('explanation-lang');
+
+        languages.forEach(function(lang) {
+            var displayName = lang.name;
+            if (lang.native_name) { displayName += ' (' + lang.native_name + ')'; }
+            targetSelect.add(new Option(displayName, lang.id));
+            explanationSelect.add(new Option(displayName, lang.id));
+        });
+
+        var currentTarget = '{{ user.default_target_language_id|default:"" }}';
+        var currentExplanation = '{{ user.default_explanation_language_id|default:"" }}';
+        if (currentTarget) targetSelect.value = currentTarget;
+        if (currentExplanation) explanationSelect.value = currentExplanation;
+    } catch (e) {
+        console.error('Failed to load languages:', e);
+        showMessage('danger', 'Failed to load languages. Please refresh the page.');
+    }
+}
+
+document.getElementById('anki-settings-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    var btn = document.getElementById('save-anki-btn');
+    var originalHTML = '<i class="bi bi-save"></i> Save';
+    setButtonLoading(btn, true);
+    try {
+        var response = await fetch('/api/v1/auth/profile/', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken'), },
+            body: JSON.stringify({ anki_connect_url: document.getElementById('anki-url').value, anki_connect_api_key: document.getElementById('anki-api-key').value, }),
+        });
+        if (response.ok) { showMessage('success', '<i class="bi bi-check-circle"></i> AnkiConnect settings saved!'); }
+        else { var data = await response.json(); showMessage('danger', '<i class="bi bi-x-circle"></i> Failed: ' + JSON.stringify(data)); }
+    } catch (e) { showMessage('danger', '<i class="bi bi-x-circle"></i> Network error: ' + e.message); }
+    setButtonLoading(btn, false, originalHTML);
+});
+
+document.getElementById('test-anki-btn').addEventListener('click', async function() {
+    var btn = this; var originalHTML = '<i class="bi bi-lightning"></i> Test Connection'; var resultDiv = document.getElementById('anki-test-result');
+    setButtonLoading(btn, true);
+    resultDiv.className = 'mt-3 alert alert-info'; resultDiv.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Testing...'; resultDiv.classList.remove('d-none');
+    try {
+        var response = await fetch('/api/v1/cards/anki/test/', { headers: { 'X-CSRFToken': getCookie('csrftoken') }, });
+        var data = await response.json();
+        if (data.connected) { resultDiv.className = 'mt-3 alert alert-success'; resultDiv.innerHTML = '<i class="bi bi-check-circle"></i> ' + data.message + ' (Version: ' + data.version + ')'; }
+        else { resultDiv.className = 'mt-3 alert alert-danger'; resultDiv.innerHTML = '<i class="bi bi-x-circle"></i> ' + data.message; }
+    } catch (e) { resultDiv.className = 'mt-3 alert alert-danger'; resultDiv.innerHTML = '<i class="bi bi-x-circle"></i> Network error: ' + e.message; }
+    setButtonLoading(btn, false, originalHTML);
+});
+
+document.getElementById('lang-settings-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    var btn = document.getElementById('save-lang-btn'); var originalHTML = '<i class="bi bi-save"></i> Save Preferences'; setButtonLoading(btn, true);
+    var targetVal = document.getElementById('target-lang').value; var explanationVal = document.getElementById('explanation-lang').value;
+    if (targetVal && explanationVal && targetVal === explanationVal) { showMessage('danger', 'Target and explanation language must be different.'); setButtonLoading(btn, false, originalHTML); return; }
+    try {
+        var response = await fetch('/api/v1/auth/profile/', { method: 'PATCH', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken'), }, body: JSON.stringify({ default_target_language: targetVal ? parseInt(targetVal) : null, default_explanation_language: explanationVal ? parseInt(explanationVal) : null, default_deck_name: document.getElementById('deck-name').value, }), });
+        if (response.ok) { showMessage('success', '<i class="bi bi-check-circle"></i> Language preferences saved!'); }
+        else { var data = await response.json(); showMessage('danger', '<i class="bi bi-x-circle"></i> Failed: ' + JSON.stringify(data)); }
+    } catch (e) { showMessage('danger', '<i class="bi bi-x-circle"></i> Network error: ' + e.message); }
+    setButtonLoading(btn, false, originalHTML);
+});
+
+document.getElementById('password-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    var btn = document.getElementById('change-pass-btn'); var originalHTML = '<i class="bi bi-key"></i> Change Password';
+    var newPass = document.getElementById('new-password').value; var confirmPass = document.getElementById('new-password-confirm').value;
+    if (newPass !== confirmPass) { showMessage('danger', 'New passwords do not match.'); return; }
+    if (newPass.length < 8) { showMessage('danger', 'Password must be at least 8 characters long.'); return; }
+    setButtonLoading(btn, true);
+    try {
+        var response = await fetch('/api/v1/auth/change-password/', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken'), }, body: JSON.stringify({ old_password: document.getElementById('old-password').value, new_password: newPass, new_password_confirm: confirmPass, }), });
+        var data = await response.json();
+        if (response.ok) { if (data.token) { localStorage.setItem('authToken', data.token); } showMessage('success', '<i class="bi bi-check-circle"></i> Password changed successfully!'); document.getElementById('password-form').reset(); }
+        else { var msg = ''; for (var key in data) { if (data.hasOwnProperty(key)) { var val = data[key]; if (Array.isArray(val)) { msg += val.join(' ') + ' '; } else if (typeof val === 'object') { for (var subkey in val) { if (val.hasOwnProperty(subkey)) { var subval = val[subkey]; msg += (Array.isArray(subval) ? subval.join(' ') : subval) + ' '; } } } else { msg += val + ' '; } } } showMessage('danger', '<i class="bi bi-x-circle"></i> ' + msg.trim()); }
+    } catch (e) { showMessage('danger', '<i class="bi bi-x-circle"></i> Network error: ' + e.message); }
+    setButtonLoading(btn, false, originalHTML);
+});
+
+document.addEventListener('DOMContentLoaded', function() { loadLanguages(); });
+</script>
+
+{% endblock %}

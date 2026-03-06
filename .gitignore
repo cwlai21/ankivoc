@@ -1,7 +1,11 @@
 /__pycache__/
 /.venv/
 .python-version
-.env
+.env*
 *.json
 test.py
 anki_voc_*.csv
+media/
+tools/
+scripts/
+*.log

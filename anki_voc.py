@@ -14,10 +14,14 @@ import hashlib
 import asyncio
 import aiohttp
 from pathlib import Path
+import argparse
+
+
+ENV_FILE = str(Path(__file__).parent.joinpath('backend', '.env'))
 
 
 def llm_generate_anki_note(model: str, system_instructions: str, word_list: str):
-    config = dotenv_values(".env")
+    config = dotenv_values(ENV_FILE)
     today = datetime.today().strftime("%Y%m%d")
     filename = f"anki_voc_{today}.csv"
     full_prompt = f"{system_instructions}\n\nWORD_LIST TO PROCESS:\n{word_list}"
@@ -197,11 +201,9 @@ def generate_azure_audio(text, filename):
             response = session.post(url, headers=headers, data=ssml.encode('utf-8'), timeout=(5, 30))
         except requests.exceptions.ConnectTimeout:
             print(f"⚠️ Azure TTS connect timeout (attempt {attempt}/{max_retries}) for {filename}")
-            err = 'connect'
             response = None
         except requests.exceptions.ReadTimeout:
             print(f"⚠️ Azure TTS read timeout (attempt {attempt}/{max_retries}) for {filename}")
-            err = 'read'
             response = None
         except requests.exceptions.RequestException as e:
             print(f"⚠️ Azure TTS request exception (attempt {attempt}/{max_retries}) for {filename}: {e}")
@@ -220,7 +222,7 @@ def generate_azure_audio(text, filename):
                     print(f"❌ Azure TTS Error after {attempt} attempts: {status} - {response.text} (filename: {filename})")
                 else:
                     print(f"❌ Azure TTS failed after {attempt} attempts for {filename}")
-                print(f"🔎 Check your .env: AZURE_API_KEY, AZURE_REGION, AZURE_VOICE_NAME")
+                print("🔎 Check your .env: AZURE_API_KEY, AZURE_REGION, AZURE_VOICE_NAME")
                 return ""
             # exponential backoff with jitter
             backoff = base_backoff * (2 ** (attempt - 1))
@@ -235,7 +237,7 @@ def generate_azure_audio(text, filename):
             print(f"❌ Azure TTS Error: {response.status_code} - {response.text} (filename: {filename})")
         else:
             print(f"❌ Azure TTS unknown error for {filename}")
-        print(f"🔎 Check your .env: AZURE_API_KEY, AZURE_REGION, AZURE_VOICE_NAME")
+        print("🔎 Check your .env: AZURE_API_KEY, AZURE_REGION, AZURE_VOICE_NAME")
         return ""
     return ""
 
@@ -255,7 +257,7 @@ def anki_request(action: str, **params):
         return None
 
 
-def add_notes_to_anki(csv_filename, target_deck="Vocabulaire", model_name="Français-(R/L)"):
+def add_notes_to_anki(csv_filename, target_deck="Français::Vocabulary", model_name="Français-(R/L)"):
     """Synchronous wrapper that runs the asyncio implementation."""
     try:
         asyncio.run(async_add_notes_to_anki(csv_filename, target_deck, model_name))
@@ -309,7 +311,7 @@ async def async_add_notes_to_anki(csv_filename, target_deck="Vocabulaire", model
         return
 
     # prepare Azure settings
-    cfg = dotenv_values('.env')
+    cfg = dotenv_values(ENV_FILE)
     AZURE_KEY = cfg.get('AZURE_API_KEY')
     AZURE_REGION = cfg.get('AZURE_REGION', 'eastus')
     AZURE_VOICE = cfg.get('AZURE_VOICE_NAME', 'fr-FR-DeniseNeural')
@@ -355,7 +357,7 @@ async def async_add_notes_to_anki(csv_filename, target_deck="Vocabulaire", model
         for key, (text, filename) in tts_jobs.items():
             tasks.append(asyncio.create_task(_fetch_and_store_tts(session, text, filename, AZURE_KEY, AZURE_REGION, AZURE_VOICE, semaphore)))
         if tasks:
-            results = await asyncio.gather(*tasks, return_exceptions=True)
+            await asyncio.gather(*tasks, return_exceptions=True)
             # update cache with successful filenames
             for key, (_, filename) in tts_jobs.items():
                 # if file was created successfully, ensure mapping exists
@@ -372,22 +374,47 @@ async def async_add_notes_to_anki(csv_filename, target_deck="Vocabulaire", model
     for fields in rows:
         word = fields[0]
         # Check if note already exists in deck
-        existing_ids = anki_request("findNotes", query=f'deck:"{target_deck}" "Français:{fields[0]}"')
+        existing_ids = anki_request("findNotes", query=f'deck:"{target_deck}" "Français:{word}"')
         if existing_ids:
             print(f"⏭️ Skipping '{fields[0]}' - already exists in deck.")
             continue
 
-        def get_audio_tag(text):
+        # This helper now just returns the filename, not the full tag
+        def get_audio_filename(text):
             norm = ' '.join(text.split())
             key = hashlib.sha1((norm + '|' + AZURE_VOICE).encode('utf-8')).hexdigest()
-            filename = audio_cache.get(key)
-            return f"[sound:{filename}]" if filename else ""
+            return audio_cache.get(key)
 
-        audio1 = get_audio_tag(fields[4]) if len(fields) > 4 else ''
-        audio2 = get_audio_tag(fields[7]) if len(fields) > 7 else ''
-        audio3 = get_audio_tag(fields[10]) if len(fields) > 10 else ''
+        audio_payload = []
+        
+        # Word Audio
+        word_audio_text = fields[4] if len(fields) > 4 else ''
+        word_audio_filename = get_audio_filename(word_audio_text)
+        if word_audio_filename:
+            audio_payload.append({
+                "filename": word_audio_filename,
+                "fields": ["Audio"]
+            })
 
-        notes.append({
+        # Example 1 Audio
+        ex1_audio_text = fields[7] if len(fields) > 7 else ''
+        ex1_audio_filename = get_audio_filename(ex1_audio_text)
+        if ex1_audio_filename:
+            audio_payload.append({
+                "filename": ex1_audio_filename,
+                "fields": ["Exemple1-Audio"]
+            })
+
+        # Example 2 Audio
+        ex2_audio_text = fields[10] if len(fields) > 10 else ''
+        ex2_audio_filename = get_audio_filename(ex2_audio_text)
+        if ex2_audio_filename:
+            audio_payload.append({
+                "filename": ex2_audio_filename,
+                "fields": ["Exemple2-Audio"]
+            })
+
+        note_data = {
             "deckName": target_deck,
             "modelName": model_name,
             "fields": {
@@ -395,50 +422,93 @@ async def async_add_notes_to_anki(csv_filename, target_deck="Vocabulaire", model
                 "English": fields[1] if len(fields) > 1 else '',
                 "Synonyme": fields[2] if len(fields) > 2 else '',
                 "Conjugaison/Féminin ou Masculin": fields[3] if len(fields) > 3 else '',
-                "Audio": audio1,
+                "Audio": "",  # Keep field empty, AnkiConnect will fill it
                 "Exemple-FR": fields[5] if len(fields) > 5 else '',
                 "Exemple-EN": fields[6] if len(fields) > 6 else '',
-                "Exemple1-Audio": audio2,
+                "Exemple1-Audio": "", # Keep field empty
                 "Exemple2-FR": fields[8] if len(fields) > 8 else '',
                 "Exemple2-EN": fields[9] if len(fields) > 9 else '',
-                "Exemple2-Audio": audio3,
+                "Exemple2-Audio": "", # Keep field empty
                 "Extend": fields[11] if len(fields) > 11 else '',
                 "Hint": fields[12] if len(fields) > 12 else ''
             },
-        })
+        }
+
+        # Add the audio payload ONLY if there are audio files to add
+        if audio_payload:
+            # We don't need to send base64 data again if files are already in Anki's media collection
+            note_data["audio"] = audio_payload
+
+        notes.append(note_data)
 
     if notes:
         anki_request("addNotes", notes=notes)
-        print(f"✅ All notes with Azure audio added successfully!")
+        print("✅ All notes with Azure audio added successfully!")
 
 
 def load_system_instructions():
-    prompt_file = "system_prompt.md"
-    if os.path.exists(prompt_file):
-        with open(prompt_file, "r", encoding="utf-8") as f:
+    """Load the system prompt used for the standalone anki_voc pipeline.
+
+    For this CLI tool we want a stable, French-specific JSON schema
+    (keys like "Français", "Exemple-FR", etc.), which is defined in the
+    repo-root system_prompt.md. The Django backend uses its own
+    backend/config/system_prompt.md with more generic, language-parameterised
+    keys; that template is not suitable for this CSV generator.
+
+    Resolution order:
+      1) Prefer the root system_prompt.md (CLI-specific schema).
+      2) If missing, fall back to backend/config/system_prompt.md.
+    """
+    # 1) Prefer repo-root system_prompt.md
+    root_prompt = Path(__file__).parent.joinpath('system_prompt.md')
+    if root_prompt.exists():
+        with open(root_prompt, "r", encoding="utf-8") as f:
             return f.read()
 
-    # If the file does not exist, raise so caller can handle/exit explicitly
-    raise FileNotFoundError("system_prompt.md not found in working directory. Please create it with the system prompt.")
+    # 2) Fallback: backend/config/system_prompt.md (may use slightly different keys)
+    backend_prompt = Path(__file__).parent.joinpath('backend', 'config', 'system_prompt.md')
+    if backend_prompt.exists():
+        with open(backend_prompt, "r", encoding="utf-8") as f:
+            return f.read()
+
+    # If neither file exists, raise so caller can handle/exit explicitly
+    raise FileNotFoundError("system_prompt.md not found. Please create it at repo root or under backend/config/.")
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Generate Anki vocabulary CSV and optionally add notes via AnkiConnect.")
+    parser.add_argument('--words', '-w', help='Inline words (multi-line string) to process')
+    parser.add_argument('--csv', '-c', help='Write only CSV to given filename (no Anki add)')
+    parser.add_argument('--model', '-m', default='gemini', choices=['gemini', 'groq', 'openai'], help='LLM provider')
+    parser.add_argument('--no-anki', action='store_true', help='Do not call AnkiConnect to add notes')
+    args = parser.parse_args()
+
+    # Clean up old CSV files before generating new ones
     import glob
-    
-    my_words = """
-        tacite
-"""
-    
-    try:
-        # Clean up old CSV files before generating new ones
-        old_csvs = glob.glob("anki_voc_*.csv")
-        for old_csv in old_csvs:
+    old_csvs = glob.glob("anki_voc_*.csv")
+    for old_csv in old_csvs:
+        try:
             os.remove(old_csv)
             print(f"🗑️ Removed old CSV: {old_csv}")
-        
+        except Exception:
+            pass
+
+    try:
         system_instructions = load_system_instructions()
-        model_choice = "gemini"  # Direct model choice
-        print(f"🤖 Using model: {model_choice}")
-        llm_generate_anki_note(model_choice, system_instructions, my_words)
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"❌ Could not load system prompt: {e}")
+        raise
+
+    input_words = args.words or "tacite"
+    model_choice = args.model
+    print(f"🤖 Using model: {model_choice}")
+
+    # Generate CSV (and optionally add to Anki)
+    # If user requested only CSV filename, write CSV and exit
+    today = datetime.today().strftime("%Y%m%d")
+    out_csv = args.csv or f"anki_voc_{today}.csv"
+
+    # Call LLM to generate CSV and add notes unless --no-anki or --csv is specified
+    llm_generate_anki_note(model_choice, system_instructions, input_words)
+    if args.no_anki:
+        print("ℹ️ Skipping AnkiConnect as requested (--no-anki).")
