@@ -317,6 +317,8 @@ async def async_add_notes_to_anki(csv_filename, target_deck="Vocabulaire", model
     AZURE_VOICE = cfg.get('AZURE_VOICE_NAME', 'fr-FR-DeniseNeural')
     if not AZURE_KEY:
         print("❌ No AZURE_API_KEY in .env; cannot generate audio.")
+        # If no key, we can still proceed without audio
+        AZURE_KEY = ""
 
     # Disk cache for audio key -> filename
     cache_path = Path("audio_cache.json")
@@ -337,37 +339,41 @@ async def async_add_notes_to_anki(csv_filename, target_deck="Vocabulaire", model
         if len(fields) < 13:
             continue
         rows.append(fields)
-        for idx, suffix in ((4, '1'), (7, '2'), (10, '3')):
-            text = fields[idx].strip() if idx < len(fields) else ''
-            if not text:
-                continue
-            norm = ' '.join(text.split())
-            voice = AZURE_VOICE
-            key = hashlib.sha1((norm + '|' + voice).encode('utf-8')).hexdigest()
-            if key in audio_cache:
-                continue
-            if key not in tts_jobs:
-                filename = f"az_{key}_{timestamp}_{suffix}.mp3"
-                tts_jobs[key] = (norm, filename)
+        # Only create TTS jobs if we have an API key
+        if AZURE_KEY:
+            for idx, suffix in ((4, '1'), (7, '2'), (10, '3')):
+                text = fields[idx].strip() if idx < len(fields) else ''
+                if not text:
+                    continue
+                norm = ' '.join(text.split())
+                voice = AZURE_VOICE
+                key = hashlib.sha1((norm + '|' + voice).encode('utf-8')).hexdigest()
+                if key in audio_cache:
+                    continue
+                if key not in tts_jobs:
+                    filename = f"az_{key}_{timestamp}_{suffix}.mp3"
+                    tts_jobs[key] = (norm, filename)
 
-    # perform async TTS for all jobs
-    semaphore = asyncio.Semaphore(6)
-    async with aiohttp.ClientSession() as session:
-        tasks = []
-        for key, (text, filename) in tts_jobs.items():
-            tasks.append(asyncio.create_task(_fetch_and_store_tts(session, text, filename, AZURE_KEY, AZURE_REGION, AZURE_VOICE, semaphore)))
-        if tasks:
-            await asyncio.gather(*tasks, return_exceptions=True)
+    # perform async TTS for all jobs if there are any
+    if AZURE_KEY and tts_jobs:
+        semaphore = asyncio.Semaphore(6)
+        async with aiohttp.ClientSession() as session:
+            tasks = []
+            for key, (text, filename) in tts_jobs.items():
+                tasks.append(asyncio.create_task(_fetch_and_store_tts(session, text, filename, AZURE_KEY, AZURE_REGION, AZURE_VOICE, semaphore)))
+            
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            
             # update cache with successful filenames
-            for key, (_, filename) in tts_jobs.items():
-                # if file was created successfully, ensure mapping exists
-                if filename and filename not in audio_cache.values():
-                    # verify by checking Anki media exists? We'll assume success if stored via AnkiConnect returned None or OK
+            for i, (key, (_, filename)) in enumerate(tts_jobs.items()):
+                # Check if the task completed successfully and returned a filename
+                if not isinstance(results[i], Exception) and results[i]:
                     audio_cache[key] = filename
             try:
                 cache_path.write_text(json.dumps(audio_cache, ensure_ascii=False, indent=2), encoding='utf-8')
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"⚠️ Could not write to audio cache: {e}")
+
 
     # build notes
     notes = []
@@ -379,71 +385,43 @@ async def async_add_notes_to_anki(csv_filename, target_deck="Vocabulaire", model
             print(f"⏭️ Skipping '{fields[0]}' - already exists in deck.")
             continue
 
-        # This helper now just returns the filename, not the full tag
-        def get_audio_filename(text):
+        def get_audio_tag(text):
+            if not AZURE_KEY or not text:
+                return ""
             norm = ' '.join(text.split())
             key = hashlib.sha1((norm + '|' + AZURE_VOICE).encode('utf-8')).hexdigest()
-            return audio_cache.get(key)
+            filename = audio_cache.get(key)
+            return f"[sound:{filename}]" if filename else ""
 
-        audio_payload = []
-        
-        # Word Audio
-        word_audio_text = fields[4] if len(fields) > 4 else ''
-        word_audio_filename = get_audio_filename(word_audio_text)
-        if word_audio_filename:
-            audio_payload.append({
-                "filename": word_audio_filename,
-                "fields": ["Audio"]
-            })
-
-        # Example 1 Audio
-        ex1_audio_text = fields[7] if len(fields) > 7 else ''
-        ex1_audio_filename = get_audio_filename(ex1_audio_text)
-        if ex1_audio_filename:
-            audio_payload.append({
-                "filename": ex1_audio_filename,
-                "fields": ["Exemple1-Audio"]
-            })
-
-        # Example 2 Audio
-        ex2_audio_text = fields[10] if len(fields) > 10 else ''
-        ex2_audio_filename = get_audio_filename(ex2_audio_text)
-        if ex2_audio_filename:
-            audio_payload.append({
-                "filename": ex2_audio_filename,
-                "fields": ["Exemple2-Audio"]
-            })
+        note_fields = {
+            "Français": fields[0],
+            "English": fields[1] if len(fields) > 1 else '',
+            "Synonyme": fields[2] if len(fields) > 2 else '',
+            "Conjugaison/Gender": fields[3] if len(fields) > 3 else '',
+            "Audio": get_audio_tag(fields[4] if len(fields) > 4 else ''),
+            "Exemple-FR": fields[5] if len(fields) > 5 else '',
+            "Exemple-EN": fields[6] if len(fields) > 6 else '',
+            "Exemple1-Audio": get_audio_tag(fields[7] if len(fields) > 7 else ''),
+            "Exemple2-FR": fields[8] if len(fields) > 8 else '',
+            "Exemple2-EN": fields[9] if len(fields) > 9 else '',
+            "Exemple2-Audio": get_audio_tag(fields[10] if len(fields) > 10 else ''),
+            "Extend": fields[11] if len(fields) > 11 else '',
+            "Hint": fields[12] if len(fields) > 12 else ''
+        }
 
         note_data = {
             "deckName": target_deck,
             "modelName": model_name,
-            "fields": {
-                "Français": fields[0],
-                "English": fields[1] if len(fields) > 1 else '',
-                "Synonyme": fields[2] if len(fields) > 2 else '',
-                "Conjugaison/Féminin ou Masculin": fields[3] if len(fields) > 3 else '',
-                "Audio": "",  # Keep field empty, AnkiConnect will fill it
-                "Exemple-FR": fields[5] if len(fields) > 5 else '',
-                "Exemple-EN": fields[6] if len(fields) > 6 else '',
-                "Exemple1-Audio": "", # Keep field empty
-                "Exemple2-FR": fields[8] if len(fields) > 8 else '',
-                "Exemple2-EN": fields[9] if len(fields) > 9 else '',
-                "Exemple2-Audio": "", # Keep field empty
-                "Extend": fields[11] if len(fields) > 11 else '',
-                "Hint": fields[12] if len(fields) > 12 else ''
-            },
+            "fields": note_fields,
+            "tags": [f"langchain_ai_{datetime.today().strftime('%Y%m%d')}"]
         }
-
-        # Add the audio payload ONLY if there are audio files to add
-        if audio_payload:
-            # We don't need to send base64 data again if files are already in Anki's media collection
-            note_data["audio"] = audio_payload
-
         notes.append(note_data)
 
     if notes:
+        # The 'addNotes' action does not need the 'audio' parameter
+        # when using [sound:] tags in fields.
         anki_request("addNotes", notes=notes)
-        print("✅ All notes with Azure audio added successfully!")
+        print(f"✅ Processed {len(notes)} notes for Anki.")
 
 
 def load_system_instructions():
@@ -479,7 +457,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Generate Anki vocabulary CSV and optionally add notes via AnkiConnect.")
     parser.add_argument('--words', '-w', help='Inline words (multi-line string) to process')
     parser.add_argument('--csv', '-c', help='Write only CSV to given filename (no Anki add)')
-    parser.add_argument('--model', '-m', default='gemini', choices=['gemini', 'groq', 'openai'], help='LLM provider')
+    parser.add_argument('--model', '-m', default='groq', choices=['gemini', 'groq', 'openai'], help='LLM provider')
     parser.add_argument('--no-anki', action='store_true', help='Do not call AnkiConnect to add notes')
     args = parser.parse_args()
 
