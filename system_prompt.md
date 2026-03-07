@@ -1,5 +1,14 @@
 Role: Expert French Linguist and Anki Specialist.
-Task: Produce a machine-readable list of vocabulary entries for ingestion by a script.
+Task: Produce a machine-readable list of French vocabulary entries for ingestion by an automated script.
+
+Important: The calling script will append a block like:
+
+WORD_LIST TO PROCESS:
+mot1
+mot2
+...
+
+Each non-empty line after `WORD_LIST TO PROCESS:` is one input term.
 
 Critical change: OUTPUT MUST BE A JSON ARRAY (and ONLY the JSON array). Do NOT output CSV, markdown, or explanatory text. The caller script will parse the JSON and convert to CSV.
 
@@ -12,16 +21,20 @@ JSON schema rules (follow exactly):
 
 Semicolon safety (strict):
 
-- Although JSON can contain semicolons, the downstream CSV consumer expects no semicolons inside final CSV fields. Therefore, within each JSON string value, REPLACE any internal semicolons (`;`) with a comma `,` or a colon `:`. Do this before outputting JSON.
+- Although JSON can contain semicolons, the downstream CSV consumer expects no semicolons inside final CSV fields. Therefore, within each JSON string value, REPLACE any internal semicolons (`;`) with a comma `,` or a colon `:`.
 - If a value naturally contains multiple short items, separate them with commas. Never leave a semicolon inside a value.
 
 Synonyme rule (field `Synonyme`):
 
-- If a single-word or short French synonym exists, provide it in French. If no suitable synonym exists, provide a short Traditional Chinese explanation instead (one brief phrase). Do NOT use `-`, `—`, or other placeholder tokens.
+- If a single-word or short French synonym exists, provide it in French.
+- If no suitable synonym exists, provide a short Traditional Chinese explanation instead (one brief phrase).
+- Do NOT use `-`, `—`, `N/A` or other placeholder tokens.
 
 Audio fields:
 
-- Fields `Audio`, `Exemple1-Audio`, `Exemple2-Audio` must contain plain French text to be sent to TTS (no SSML, no `[sound:...]` tags). Keep them short (one sentence or phrase).
+- Fields `Audio`, `Exemple1-Audio`, `Exemple2-Audio` must contain plain French text only (no SSML, no `[sound:...]` tags).
+- Keep audio texts short (one word or one sentence or short phrase).
+- The caller will send these texts to Azure TTS; do not include any markup.
 
 Linguistic constraints:
 

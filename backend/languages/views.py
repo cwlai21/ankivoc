@@ -6,11 +6,14 @@ from .serializers import LanguageSerializer, LanguageListSerializer
 class LanguageListView(generics.ListAPIView):
     """
     GET /api/v1/languages/
-    List all active languages.
+    List all languages.
     """
-    queryset = Language.objects.filter(is_active=True)
     serializer_class = LanguageListSerializer
     permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        """Return all languages for selection (target/explanation)."""
+        return Language.objects.all()
 
 
 class LanguageDetailView(generics.RetrieveAPIView):
@@ -18,10 +21,13 @@ class LanguageDetailView(generics.RetrieveAPIView):
     GET /api/v1/languages/{code}/
     Get language detail with its card template.
     """
-    queryset = Language.objects.filter(is_active=True)
     serializer_class = LanguageSerializer
     permission_classes = [permissions.IsAuthenticated]
     lookup_field = 'code'
+
+    def get_queryset(self):
+        """Allow retrieving any language by code (used for template info)."""
+        return Language.objects.all()
 # Views for `languages` app (placeholder).
 
 # Implement view functions or class-based views when needed.

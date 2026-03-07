@@ -96,8 +96,8 @@ RULES:
 5. For nouns: include gender (masculin/féminin) and plural form.
 6. For verbs: include key conjugations (présent, passé composé, futur).
 7. For adjectives: include masculine/feminine forms.
-8. The "extend" field should contain useful notes like common expressions, etymology, or usage tips.
-9. The "hint" field should be a short mnemonic or memory aid.
+8. The "extend" field must be written entirely in {explanation_lang_name} and should contain useful notes like common expressions, etymology, or usage tips.
+9. The "hint" field must be written entirely in {explanation_lang_name} and should be a short mnemonic or memory aid.
 
 You MUST return ONLY valid JSON with exactly these fields:
 {{
@@ -109,8 +109,8 @@ You MUST return ONLY valid JSON with exactly these fields:
     "exemple_explanation": "same sentence translated to {explanation_lang_name}",
     "exemple2_target": "second example sentence in {target_lang_name}",
     "exemple2_explanation": "second sentence translated to {explanation_lang_name}",
-    "extend": "additional notes, expressions, usage tips",
-    "hint": "short memory aid or mnemonic"
+    "extend": "additional notes, expressions, usage tips, written in {explanation_lang_name}",
+    "hint": "short memory aid or mnemonic, written in {explanation_lang_name}"
 }}
 
 Return ONLY the JSON object. No markdown, no code blocks, no extra text."""
@@ -120,7 +120,9 @@ Return ONLY the JSON object. No markdown, no code blocks, no extra text."""
         return (
             f'Generate a complete {target_lang_name} flashcard for: "{input_text}"\n'
             f'Target language: {target_lang_name}\n'
-            f'Explanation language: {explanation_lang_name}'
+            f'Explanation language: {explanation_lang_name}\n'
+            f'All explanation-related fields (explanation_word, exemple_explanation, '
+            f'exemple2_explanation, extend, hint) MUST be written in {explanation_lang_name} only.'
         )
  
     def translate(self, text, target_lang_code, explanation_lang_code):

@@ -38,7 +38,7 @@ class LanguageListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Language
-        fields = ['id', 'name', 'code', 'native_name', 'has_template']
+        fields = ['id', 'name', 'code', 'native_name', 'has_template', 'is_active']
 
     def get_has_template(self, obj):
         return hasattr(obj, 'card_template')

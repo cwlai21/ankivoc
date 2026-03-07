@@ -30,10 +30,21 @@ class BatchCreateView(APIView):
         data = serializer.validated_data
 
         # Create the batch
+        # Explanation language logic
+        explanation_language = data['explanation_language']
+        if data['target_language'].code == 'en':
+            # If target is English, force explanation to Chinese
+            from languages.models import Language
+            explanation_language = Language.objects.get(code='zh')
+        elif explanation_language.code not in ['en', 'fr', 'zh']:
+            # Otherwise, default to English if not one of the allowed
+            from languages.models import Language
+            explanation_language = Language.objects.get(code='en')
+
         batch = VocabularyBatch.objects.create(
             user=request.user,
             target_language=data['target_language'],
-            explanation_language=data['explanation_language'],
+            explanation_language=explanation_language,
             raw_input='\n'.join(data['vocabulary']),
             status=VocabularyBatch.Status.PENDING,
         )

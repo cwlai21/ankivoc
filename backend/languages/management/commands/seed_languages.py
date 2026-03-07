@@ -14,6 +14,7 @@ class Command(BaseCommand):
                 'native_name': 'Français',
                 'azure_tts_voice': 'fr-FR-DeniseNeural',
                 'azure_tts_locale': 'fr-FR',
+                'is_active': True,
             },
             {
                 'name': 'English',
@@ -21,34 +22,7 @@ class Command(BaseCommand):
                 'native_name': 'English',
                 'azure_tts_voice': 'en-US-JennyNeural',
                 'azure_tts_locale': 'en-US',
-            },
-            {
-                'name': 'Spanish',
-                'code': 'es',
-                'native_name': 'Español',
-                'azure_tts_voice': 'es-ES-ElviraNeural',
-                'azure_tts_locale': 'es-ES',
-            },
-            {
-                'name': 'German',
-                'code': 'de',
-                'native_name': 'Deutsch',
-                'azure_tts_voice': 'de-DE-KatjaNeural',
-                'azure_tts_locale': 'de-DE',
-            },
-            {
-                'name': 'Japanese',
-                'code': 'ja',
-                'native_name': '日本語',
-                'azure_tts_voice': 'ja-JP-NanamiNeural',
-                'azure_tts_locale': 'ja-JP',
-            },
-            {
-                'name': 'Korean',
-                'code': 'ko',
-                'native_name': '한국어',
-                'azure_tts_voice': 'ko-KR-SunHiNeural',
-                'azure_tts_locale': 'ko-KR',
+                'is_active': True,
             },
             {
                 'name': 'Chinese (Mandarin)',
@@ -56,15 +30,48 @@ class Command(BaseCommand):
                 'native_name': '中文',
                 'azure_tts_voice': 'zh-CN-XiaoxiaoNeural',
                 'azure_tts_locale': 'zh-CN',
+                'is_active': True,
+            },
+            {
+                'name': 'Spanish',
+                'code': 'es',
+                'native_name': 'Español',
+                'azure_tts_voice': 'es-ES-ElviraNeural',
+                'azure_tts_locale': 'es-ES',
+                'is_active': False,
+            },
+            {
+                'name': 'German',
+                'code': 'de',
+                'native_name': 'Deutsch',
+                'azure_tts_voice': 'de-DE-KatjaNeural',
+                'azure_tts_locale': 'de-DE',
+                'is_active': False,
+            },
+            {
+                'name': 'Japanese',
+                'code': 'ja',
+                'native_name': '日本語',
+                'azure_tts_voice': 'ja-JP-NanamiNeural',
+                'azure_tts_locale': 'ja-JP',
+                'is_active': False,
+            },
+            {
+                'name': 'Korean',
+                'code': 'ko',
+                'native_name': '한국어',
+                'azure_tts_voice': 'ko-KR-SunHiNeural',
+                'azure_tts_locale': 'ko-KR',
+                'is_active': False,
             },
         ]
 
         for lang_data in languages_data:
-            lang, created = Language.objects.get_or_create(
+            lang, created = Language.objects.update_or_create(
                 code=lang_data['code'],
                 defaults=lang_data
             )
-            status = 'Created' if created else 'Already exists'
+            status = 'Created' if created else 'Updated'
             self.stdout.write(f'  {status}: {lang.name}')
 
         # ── Create French Card Template ──

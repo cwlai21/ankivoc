@@ -282,47 +282,66 @@ class CardPipeline:
         if self.target_lang.code == 'fr':
             conjugaison_genre = card.conjugaison_genre
             target_word = card.target_word
-            
+
             if conjugaison_genre and target_word:
                 logger.info(f"--- Applying French Article Rules for word: {target_word} ---")
-                
+
                 front = target_word.strip()
                 original_front = front
 
-                # Check and remove existing articles
-                existing_articles = ["l'", "le ", "la ", "les "]
-                for existing_article in existing_articles:
-                    if front.lower().startswith(existing_article):
-                        front = front[len(existing_article):].lstrip()
-                        break
-                
-                cleaned_word = front.split(":")[-1].strip()
-                starts_with_vowel = cleaned_word.lower() and cleaned_word.lower()[0] in 'aeiouhâêîôûàéèù'
-                
-                conjugaison_lower = conjugaison_genre.lower()
-                is_masculin = 'masculin' in conjugaison_lower
-                is_feminin = 'feminin' in conjugaison_lower or 'féminin' in conjugaison_lower
-                is_pluriel = 'pluriel' in conjugaison_lower
+                # If the word already starts with a contracted preposition/article
+                # like "du", "de la", "de l'", "des", "au", "aux", keep it as-is
+                # to avoid duplicating (e.g. "du cabaret" -> "du du cabaret").
+                preposition_prefixes = [
+                    "du ", "de la ", "de l'", "des ", "au ", "aux ",
+                ]
+                lower_front = front.lower()
+                if any(lower_front.startswith(p) for p in preposition_prefixes):
+                    logger.info(
+                        "Detected existing French preposition/article prefix, "
+                        "keeping original: '%s'", front
+                    )
+                else:
+                    # Check and remove simple existing articles before recomputing
+                    existing_articles = ["l'", "le ", "la ", "les "]
+                    for existing_article in existing_articles:
+                        if lower_front.startswith(existing_article):
+                            front = front[len(existing_article):].lstrip()
+                            lower_front = front.lower()
+                            break
 
-                article = ''
-                if is_pluriel:
-                    article = 'des'
-                elif is_masculin:
-                    if starts_with_vowel:
-                        article = "un"
-                    else:
-                        article = 'du'
-                elif is_feminin:
-                    if starts_with_vowel:
-                        article = "de l'"
-                    else:
-                        article = 'de la'
-                
-                final_text = f"{article} {front}".strip() if article else front
+                    cleaned_word = front.split(":")[-1].strip()
+                    starts_with_vowel = (
+                        cleaned_word.lower()
+                        and cleaned_word.lower()[0] in 'aeiouhâêîôûàéèù'
+                    )
 
-                if final_text != original_front:
-                    logger.info(f"Text changed from '{original_front}' to '{final_text}' for TTS")
-                    card.target_word = final_text
+                    conjugaison_lower = conjugaison_genre.lower()
+                    is_masculin = 'masculin' in conjugaison_lower
+                    is_feminin = 'feminin' in conjugaison_lower or 'féminin' in conjugaison_lower
+                    is_pluriel = 'pluriel' in conjugaison_lower
+
+                    article = ''
+                    if is_pluriel:
+                        article = 'des'
+                    elif is_masculin:
+                        if starts_with_vowel:
+                            article = "un"
+                        else:
+                            article = 'du'
+                    elif is_feminin:
+                        if starts_with_vowel:
+                            article = "de l'"
+                        else:
+                            article = 'de la'
+
+                    final_text = f"{article} {front}".strip() if article else front
+
+                    if final_text != original_front:
+                        logger.info(
+                            "Text changed from '%s' to '%s' for TTS", original_front, final_text
+                        )
+                        card.target_word = final_text
         
         card.status = VocabularyCard.Status.TRANSLATED
         card.save()

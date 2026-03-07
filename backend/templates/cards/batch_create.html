@@ -292,8 +292,14 @@ async function loadLanguages() {
             }
 
             var hasTemplate = lang.has_template ? '' : ' [No template]';
+
+            // 目標語言：保留所有語言
             targetSelect.add(new Option(displayName + hasTemplate, lang.code));
-            explanationSelect.add(new Option(displayName, lang.code));
+
+            // 解釋語言：只顯示啟用的語言（目前為 English/French/Chinese）
+            if (lang.is_active) {
+                explanationSelect.add(new Option(displayName, lang.code));
+            }
         });
 
         // Set defaults from user preferences
