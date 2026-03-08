@@ -19,7 +19,7 @@ Output ONLY a JSON array. No markdown blocks, no intro/outro. If formatting fail
 1.  "{{target_language|default:"French"}}"
 2.  "{{explanation_language|default:"English"}}"
 3.  "Synonyme"
-4.  "Conjugaison/Féminin ou Masculin"
+4.  "Conjugaison/Gender"
 5.  "Audio"
 6.  "Exemple-{{target_language|default:"French"}}"
 7.  "Exemple-{{explanation_language|default:"English"}}"
@@ -33,7 +33,12 @@ Output ONLY a JSON array. No markdown blocks, no intro/outro. If formatting fail
 # Linguistic Constraints
 - **Level**: C1/C2. Use sophisticated, natural, and idiomatic language.
 - **Audio Fields**: Plain text only (no SSML or tags).
-- **Grammar Field**: Provide part of speech, gender for nouns, or conjugation type for verbs.
+- **Grammar Field ("Conjugaison/Gender")**: 
+  - For **nouns**: MUST specify gender (masculin/masculine/m. or féminin/feminine/f.) and optionally plural form
+  - For **verbs**: Provide conjugation type (e.g., "verbe du 1er groupe")
+  - For **adjectives**: Provide masculine/feminine forms
+  - For **expressions/phrases**: Indicate part of speech (e.g., "expression idiomatique")
+  - **CRITICAL**: This field must NEVER be empty. Always provide grammatical information.
 
 # Example Reference
 Input: "avoir le cafard"
@@ -41,7 +46,7 @@ Input: "avoir le cafard"
   "French": "avoir le cafard",
   "English": "to feel blue / to have the blues",
   "Synonyme": "se morfondre",
-  "Conjugaison/Féminin ou Masculin": "Expression idiomatique (verbe du 3ème groupe)",
+  "Conjugaison/Gender": "Expression idiomatique (verbe du 3ème groupe)",
   "Audio": "avoir le cafard",
   "Exemple-French": "Depuis son départ, il a vraiment le cafard.",
   "Exemple-English": "Since her departure, he's really been feeling down.",

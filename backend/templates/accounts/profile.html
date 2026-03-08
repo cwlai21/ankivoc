@@ -190,11 +190,22 @@ async function loadLanguages() {
         var targetSelect = document.getElementById('target-lang');
         var explanationSelect = document.getElementById('explanation-lang');
 
+        // 只允許這三個語言作為解釋語言
+        var allowedExplanationLangIds = [];
+        var allowedExplanationCodes = ['en', 'fr', 'zh'];
+
         languages.forEach(function(lang) {
             var displayName = lang.name;
             if (lang.native_name) { displayName += ' (' + lang.native_name + ')'; }
+            
+            // 目標語言：所有語言
             targetSelect.add(new Option(displayName, lang.id));
-            explanationSelect.add(new Option(displayName, lang.id));
+            
+            // 解釋語言：只顯示 English/French/Chinese
+            if (allowedExplanationCodes.indexOf(lang.code) !== -1) {
+                explanationSelect.add(new Option(displayName, lang.id));
+                allowedExplanationLangIds.push(lang.id);
+            }
         });
 
         var currentTarget = '{{ user.default_target_language_id|default:"" }}';

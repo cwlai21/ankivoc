@@ -285,6 +285,9 @@ async function loadLanguages() {
         var targetSelect = document.getElementById('target-language');
         var explanationSelect = document.getElementById('explanation-language');
 
+        // 只允許這三個語言作為解釋語言
+        var allowedExplanationLangs = ['en', 'fr', 'zh'];
+        
         languages.forEach(function(lang) {
             var displayName = lang.name;
             if (lang.native_name) {
@@ -296,8 +299,8 @@ async function loadLanguages() {
             // 目標語言：保留所有語言
             targetSelect.add(new Option(displayName + hasTemplate, lang.code));
 
-            // 解釋語言：只顯示啟用的語言（目前為 English/French/Chinese）
-            if (lang.is_active) {
+            // 解釋語言：只顯示 English/French/Chinese
+            if (allowedExplanationLangs.indexOf(lang.code) !== -1) {
                 explanationSelect.add(new Option(displayName, lang.code));
             }
         });
@@ -310,8 +313,19 @@ async function loadLanguages() {
             targetSelect.value = defaultTarget;
             selectedTargetCode = defaultTarget;
             checkTemplate(defaultTarget);
-        }
-        if (defaultExplanation) {
+            
+            // 自動設定預設解釋語言
+            if (defaultTarget === 'en') {
+                // 目標語言是英語時，預設解釋語言為中文
+                explanationSelect.value = 'zh';
+                selectedExplanationCode = 'zh';
+            } else {
+                // 其他目標語言時，預設解釋語言為英語
+                explanationSelect.value = 'en';
+                selectedExplanationCode = 'en';
+            }
+        } else if (defaultExplanation) {
+            // 只有在沒有預設目標語言時才使用預設解釋語言
             explanationSelect.value = defaultExplanation;
             selectedExplanationCode = defaultExplanation;
         }
@@ -369,6 +383,18 @@ document.getElementById('vocabulary-input').addEventListener('input', updateWord
 document.getElementById('target-language').addEventListener('change', function() {
     selectedTargetCode = this.value;
     checkTemplate(this.value);
+    
+    // 自動設定預設解釋語言
+    var explanationSelect = document.getElementById('explanation-language');
+    if (this.value === 'en') {
+        // 目標語言是英語時，預設解釋語言為中文
+        explanationSelect.value = 'zh';
+    } else if (this.value) {
+        // 其他目標語言時，預設解釋語言為英語
+        explanationSelect.value = 'en';
+    }
+    selectedExplanationCode = explanationSelect.value;
+    
     validateForm();
 });
 

@@ -363,7 +363,8 @@ Return ONLY the JSON object. No markdown, no code blocks, no extra text."""
                 'English': 'explanation_word',
                 'Français': 'target_word',  # Legacy support
                 'Synonyme': 'synonyme',
-                'Conjugaison/Féminin ou Masculin': 'conjugaison_genre',
+                'Conjugaison/Gender': 'conjugaison_genre',  # New field name
+                'Conjugaison/Féminin ou Masculin': 'conjugaison_genre',  # Legacy support
                 'Audio': 'audio',
                 'Exemple-French': 'exemple_target',
                 'Exemple-English': 'exemple_explanation',

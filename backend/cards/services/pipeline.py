@@ -317,16 +317,16 @@ class CardPipeline:
                     )
 
                     conjugaison_lower = conjugaison_genre.lower()
-                    is_masculin = 'masculin' in conjugaison_lower
-                    is_feminin = 'feminin' in conjugaison_lower or 'féminin' in conjugaison_lower
-                    is_pluriel = 'pluriel' in conjugaison_lower
+                    is_masculin = 'masculin' in conjugaison_lower or 'masculine' in conjugaison_lower or 'm.' in conjugaison_lower
+                    is_feminin = 'feminin' in conjugaison_lower or 'féminin' in conjugaison_lower or 'feminine' in conjugaison_lower or 'f.' in conjugaison_lower
+                    is_pluriel = 'pluriel' in conjugaison_lower or 'plural' in conjugaison_lower
 
                     article = ''
                     if is_pluriel:
                         article = 'des'
                     elif is_masculin:
                         if starts_with_vowel:
-                            article = "un"
+                            article = "de l'"
                         else:
                             article = 'du'
                     elif is_feminin:
@@ -447,7 +447,7 @@ class CardPipeline:
             'français': 'Français',
             'english': 'English',
             'synonyme': 'Synonyme',
-            'conjugaison/féminin ou masculin': 'Conjugaison/Féminin ou masculin',
+            'conjugaison/gender': 'Conjugaison/Gender',
             'exemple-fr': 'exemple-FR',
             'exemple-en': 'exemple-EN',
             'exemple2-fr': 'exemple2-FR',
@@ -483,7 +483,7 @@ class CardPipeline:
             'Français': card.target_word,
             'English': card.explanation_word,
             'Synonyme': card.synonyme,
-            'Conjugaison/Féminin ou masculin': card.conjugaison_genre,
+            'Conjugaison/Gender': card.conjugaison_genre,
             'exemple-FR': card.exemple_target,
             'exemple-EN': card.exemple_explanation,
             'exemple2-FR': card.exemple2_target,
