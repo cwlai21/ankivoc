@@ -354,43 +354,44 @@ Return ONLY the JSON object. No markdown, no code blocks, no extra text."""
                 raise LLMTranslationError(f'Unexpected JSON type: {type(parsed).__name__}')
 
             # Map alternative field names to expected field names
-            # The system prompt uses language-based field names (e.g., "French", "Exemple-French")
-            # but our code expects normalized English field names
+            # Build dynamic field mapping based on target/explanation language names
+            # The LLM returns language-specific field names (e.g., "Spanish", "Exemple-Spanish")
+            # which we map to our internal normalized field names
             field_mapping = {
-                # Language-based field names -> our expected field names
-                # These will be dynamically matched based on the target/explanation language
-                'French': 'target_word',
-                'English': 'explanation_word',
-                'Français': 'target_word',  # Legacy support
-                'Synonyme': 'synonyme',
-                'Conjugaison/Gender': 'conjugaison_genre',  # New field name
-                'Conjugaison/Féminin ou Masculin': 'conjugaison_genre',  # Legacy support
-                'Audio': 'audio',
-                'Exemple-French': 'exemple_target',
-                'Exemple-English': 'exemple_explanation',
-                'Exemple-FR': 'exemple_target',  # Legacy support
-                'Exemple-EN': 'exemple_explanation',  # Legacy support
-                'Exemple1-Audio': 'exemple1_audio',
-                'Exemple2-French': 'exemple2_target',
-                'Exemple2-English': 'exemple2_explanation',
-                'Exemple2-FR': 'exemple2_target',  # Legacy support
-                'Exemple2-EN': 'exemple2_explanation',  # Legacy support
-                'Exemple2-Audio': 'exemple2_audio',
-                'Extend': 'extend',
-                'Hint': 'hint',
-            }
-
-            # Also add dynamic mappings based on the actual target/explanation language names
-            # This handles cases where the LLM uses the actual language name in field names
-            dynamic_mappings = {
+                # Dynamic mappings based on actual language names
                 target_lang_name: 'target_word',
                 explanation_lang_name: 'explanation_word',
                 f'Exemple-{target_lang_name}': 'exemple_target',
                 f'Exemple-{explanation_lang_name}': 'exemple_explanation',
                 f'Exemple2-{target_lang_name}': 'exemple2_target',
                 f'Exemple2-{explanation_lang_name}': 'exemple2_explanation',
+                
+                # Legacy support for French
+                'French': 'target_word',
+                'English': 'explanation_word',
+                'Français': 'target_word',
+                'Exemple-French': 'exemple_target',
+                'Exemple-English': 'exemple_explanation',
+                'Exemple-FR': 'exemple_target',
+                'Exemple-EN': 'exemple_explanation',
+                'Exemple2-French': 'exemple2_target',
+                'Exemple2-English': 'exemple2_explanation',
+                'Exemple2-FR': 'exemple2_target',
+                'Exemple2-EN': 'exemple2_explanation',
+                
+                # Common field names (language-agnostic)
+                'Synonyme': 'synonyme',
+                'Synonym': 'synonyme',
+                'Synonyms': 'synonyme',
+                'Conjugaison/Gender': 'conjugaison_genre',
+                'Conjugaison/Féminin ou Masculin': 'conjugaison_genre',  # Legacy
+                'Grammar': 'conjugaison_genre',
+                'Audio': 'audio',
+                'Exemple1-Audio': 'exemple1_audio',
+                'Exemple2-Audio': 'exemple2_audio',
+                'Extend': 'extend',
+                'Hint': 'hint',
             }
-            field_mapping.update(dynamic_mappings)
 
             # Create normalized result with expected field names
             normalized_result = {}

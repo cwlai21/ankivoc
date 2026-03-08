@@ -79,6 +79,87 @@ class CardTemplate(models.Model):
 		default='',
 		help_text='Prompt template for LLM. Use {input_text}, {target_lang}, {explanation_lang}'
 	)
+	front_template = models.TextField(
+		blank=True,
+		default='{{Français}}',
+		help_text='Anki card front template (qfmt)'
+	)
+	back_template = models.TextField(
+		blank=True,
+		default='{{FrontSide}}\n\n<hr id=answer>\n\n{{English}}',
+		help_text='Anki card back template (afmt)'
+	)
+	css_style = models.TextField(
+		blank=True,
+		default=""".card {
+    font-family: 'Segoe UI', 'Microsoft YaHei', '微軟正黑體', Arial, sans-serif;
+    font-size: 20px;
+    text-align: center;
+    color: #2c3e50;
+    background-color: #f9f9f9;
+    padding: 20px;
+    line-height: 1.6;
+}
+
+.card .front {
+    font-size: 28px;
+    font-weight: bold;
+    color: #2980b9;
+    margin-bottom: 15px;
+}
+
+.card .translation {
+    font-size: 22px;
+    color: #27ae60;
+    margin: 15px 0;
+}
+
+.card .grammar,
+.card .synonym {
+    font-size: 16px;
+    color: #7f8c8d;
+    margin: 10px 0;
+    font-style: italic;
+}
+
+.card .example {
+    font-size: 18px;
+    color: #34495e;
+    margin: 12px 0;
+    padding: 8px;
+    background-color: #ecf0f1;
+    border-radius: 4px;
+}
+
+.card .example-translation {
+    font-size: 16px;
+    color: #95a5a6;
+    margin-top: 5px;
+}
+
+.card hr {
+    border: none;
+    border-top: 2px solid #bdc3c7;
+    margin: 20px 0;
+}
+
+.card .audio {
+    margin: 15px 0;
+}
+
+.card .hint,
+.card .extend {
+    font-size: 14px;
+    color: #8e44ad;
+    margin: 10px 0;
+    text-align: left;
+    padding: 10px;
+    background-color: #f4ecf7;
+    border-left: 3px solid #9b59b6;
+    border-radius: 3px;
+}""",
+		help_text='Anki card CSS styling'
+	)
 
 	class Meta:
 		db_table = 'card_templates'

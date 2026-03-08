@@ -137,68 +137,155 @@ class AnkiConnectClient:
         if model_name in existing:
             return True
 
-        # Build minimal card templates using the provided fields
+        # Build dual card templates (Reading + Listening) using the provided fields
         if not in_order_fields:
             in_order_fields = ['Front', 'Back']
 
         first = in_order_fields[0]
         second = in_order_fields[1] if len(in_order_fields) > 1 else ''
 
-        qfmt = f"<div>{{{{{first}}}}}</div>"
-        if second:
-            qfmt += f"<div style='color:#666'>{{{{{second}}}}}</div>"
-
+        # Card 1: Reading card - show target word/phrase
+        qfmt1 = f"<div style='font-size: 24px;'>{{{{{first}}}}}</div>"
+        
         all_fields_html = ''.join([f"<div><b>{f}</b>: {{{{{f}}}}}</div>" for f in in_order_fields])
-        afmt = "{{FrontSide}}<hr id=answer>" + all_fields_html
+        afmt1 = "{{FrontSide}}<hr id=answer>" + all_fields_html
 
-        css = '.card { font-family: arial; font-size: 14px; }'
+        # Card 2: Listening card - show audio prompt
+        # Find 'Audio' field in the field list
+        audio_field = None
+        for f in in_order_fields:
+            if 'audio' in f.lower() and 'exemple' not in f.lower():
+                audio_field = f
+                break
+        
+        if audio_field:
+            # Listening card: play audio, then show answer
+            qfmt2 = f"<div style='font-size: 14px; color: #666;'>🔊 Listen and identify:</div><br>{{{{{audio_field}}}}}"
+            afmt2 = f"{{{{FrontSide}}}}<hr id=answer><div style='font-size: 24px;'>{{{{{first}}}}}</div>"
+            if second:
+                afmt2 += f"<br><div style='font-size: 18px;'>{{{{{second}}}}}</div>"
+        else:
+            # Fallback: Create a different Card 2 that shows translation first
+            # This ensures Card 2 front is never identical to Card 1
+            if second:
+                qfmt2 = f"<div style='font-size: 20px; color: #666;'>Translate to {first}:</div><br><div style='font-size: 24px;'>{{{{{second}}}}}</div>"
+                afmt2 = f"{{{{FrontSide}}}}<hr id=answer><div style='font-size: 24px;'>{{{{{first}}}}}</div>"
+            else:
+                # If only one field, make Card 2 show a hint
+                qfmt2 = f"<div style='color: #999;'>What is:</div><br><div style='font-size: 18px;'>{{{{{first}}}}}</div>"
+                afmt2 = "{{FrontSide}}<hr id=answer>" + all_fields_html
+
+        # Universal CSS template for all languages
+        css = """.card {
+    font-family: 'Segoe UI', 'Microsoft YaHei', '微軟正黑體', Arial, sans-serif;
+    font-size: 20px;
+    text-align: center;
+    color: #2c3e50;
+    background-color: #f9f9f9;
+    padding: 20px;
+    line-height: 1.6;
+}
+
+.card .front {
+    font-size: 28px;
+    font-weight: bold;
+    color: #2980b9;
+    margin-bottom: 15px;
+}
+
+.card .translation {
+    font-size: 22px;
+    color: #27ae60;
+    margin: 15px 0;
+}
+
+.card .grammar,
+.card .synonym {
+    font-size: 16px;
+    color: #7f8c8d;
+    margin: 10px 0;
+    font-style: italic;
+}
+
+.card .example {
+    font-size: 18px;
+    color: #34495e;
+    margin: 12px 0;
+    padding: 8px;
+    background-color: #ecf0f1;
+    border-radius: 4px;
+}
+
+.card .example-translation {
+    font-size: 16px;
+    color: #95a5a6;
+    margin-top: 5px;
+}
+
+.card hr {
+    border: none;
+    border-top: 2px solid #bdc3c7;
+    margin: 20px 0;
+}
+
+.card .audio {
+    margin: 15px 0;
+}
+
+.card .hint,
+.card .extend {
+    font-size: 14px;
+    color: #8e44ad;
+    margin: 10px 0;
+    text-align: left;
+    padding: 10px;
+    background-color: #f4ecf7;
+    border-left: 3px solid #9b59b6;
+    border-radius: 3px;
+}
+"""
+        
+        # Create dual card templates for Reading + Listening
+        # AnkiConnect expects 'Name', 'Front', 'Back' (capitalized)
         card_templates = [
             {
-                'name': 'Card 1',
-                'qfmt': qfmt,
-                'afmt': afmt,
-            }
+                'Name': 'Card 1',
+                'Front': qfmt1,
+                'Back': afmt1,
+            },
+            {
+                'Name': 'Card 2',
+                'Front': qfmt2,
+                'Back': afmt2,
+            },
         ]
 
         # Try multiple candidate payload shapes to handle differing AnkiConnect versions
         candidates = [
-            # Common: cardTemplates + flds
-            {
-                'modelName': model_name,
-                'inOrderFields': in_order_fields,
-                'css': css,
-                'cardTemplates': card_templates,
-                'flds': [{'name': f} for f in in_order_fields],
-            },
-            # cardTemplates + fields
-            {
-                'modelName': model_name,
-                'inOrderFields': in_order_fields,
-                'css': css,
-                'cardTemplates': card_templates,
-                'fields': [{'name': f} for f in in_order_fields],
-            },
-            # cardTemplates only
+            # Standard AnkiConnect format with capitalized template keys
             {
                 'modelName': model_name,
                 'inOrderFields': in_order_fields,
                 'css': css,
                 'cardTemplates': card_templates,
             },
-            # older/alternate keys: templates + flds
+            # Legacy lowercase format
             {
                 'modelName': model_name,
                 'inOrderFields': in_order_fields,
                 'css': css,
-                'templates': card_templates,
-                'flds': [{'name': f} for f in in_order_fields],
-            },
-            # templates only
-            {
-                'modelName': model_name,
-                'inOrderFields': in_order_fields,
-                'css': css,
-                'templates': card_templates,
+                'cardTemplates': [
+                    {
+                        'name': 'Card 1',
+                        'qfmt': qfmt1,
+                        'afmt': afmt1,
+                    },
+                    {
+                        'name': 'Card 2',
+                        'qfmt': qfmt2,
+                        'afmt': afmt2,
+                    },
+                ],
             },
         ]
 

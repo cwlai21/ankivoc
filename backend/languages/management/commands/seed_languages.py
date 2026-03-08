@@ -28,8 +28,8 @@ class Command(BaseCommand):
                 'name': 'Chinese (Mandarin)',
                 'code': 'zh',
                 'native_name': '中文',
-                'azure_tts_voice': 'zh-CN-XiaoxiaoNeural',
-                'azure_tts_locale': 'zh-CN',
+                'azure_tts_voice': 'zh-TW-HsiaoChenNeural',
+                'azure_tts_locale': 'zh-TW',
                 'is_active': True,
             },
             {

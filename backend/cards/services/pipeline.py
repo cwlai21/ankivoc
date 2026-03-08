@@ -38,14 +38,13 @@ class CardPipeline:
             api_key=self.user.anki_connect_api_key,
         )
  
-        # Get the card template for target language
+        # Get or auto-create card template for target language
         try:
             self.template = self.target_lang.card_template
         except Exception:
-            raise ValueError(
-                f'No card template found for {self.target_lang.name}. '
-                f'Please ask an admin to create one.'
-            )
+            # Auto-generate default template for this language
+            logger.info(f'No template found for {self.target_lang.name}, generating default template')
+            self.template = self._create_default_template()
 
         # Thread pool for running blocking I/O (LLM, TTS) with timeouts
         # Use a small pool per pipeline instance to avoid blocking the main thread.
@@ -54,6 +53,142 @@ class CardPipeline:
         # Timeouts (seconds) for external calls — configurable via settings
         self._llm_timeout = getattr(settings, 'LLM_CALL_TIMEOUT_SECONDS', 20)
         self._tts_timeout = getattr(settings, 'TTS_CALL_TIMEOUT_SECONDS', 15)
+
+    def _create_default_template(self):
+        """
+        Auto-generate a default CardTemplate for the target language.
+        Creates a template following the model: <NativeLanguageName>-(R/L)
+        with dual card types (Reading + Listening).
+        
+        Returns:
+            CardTemplate instance
+        """
+        from languages.models import CardTemplate
+        
+        # Get native name for deck/model naming
+        native_name = self.target_lang.native_name or self.target_lang.name
+        explanation_name = self.explanation_lang.name
+        
+        # Build model name: <NativeLanguageName>-(R/L), e.g., Español-(R/L)
+        model_name = f"{native_name}-(R/L)"
+        
+        # Build deck name: <NativeLanguageName>::Vocabulary
+        deck_name = f"{native_name}::Vocabulary"
+        
+        # Define field list using dynamic language names
+        fields = [
+            native_name,  # Target language word (e.g., "Español")
+            explanation_name,  # Explanation language (e.g., "English")
+            'Synonyme',
+            'Conjugaison/Gender',
+            'Audio',
+            f'exemple-{self.target_lang.code.upper()}',  # e.g., exemple-ES
+            f'exemple-{self.explanation_lang.code.upper()}',  # e.g., exemple-EN
+            'Exemple1-Audio',
+            f'exemple2-{self.target_lang.code.upper()}',
+            f'exemple2-{self.explanation_lang.code.upper()}',
+            'Exemple2-Audio',
+            'Extend',
+            'Hint',
+        ]
+        
+        # Card 1 template (Reading): Show target word
+        front_template = f"{{{{{native_name}}}}}"
+        
+        # Card 1 back: Show everything
+        back_template = f"""{{{{FrontSide}}}}
+<hr id=answer>
+<div style="font-size: 24px;">{{{{{explanation_name}}}}}</div>
+<div style="margin-top: 10px; color: #666;">{{{{Synonyme}}}}</div>
+<div style="margin-top: 10px; color: #666;">{{{{Conjugaison/Gender}}}}</div>
+<div style="margin-top: 15px;">{{{{exemple-{self.target_lang.code.upper()}}}}}</div>
+<div style="color: #888;">{{{{exemple-{self.explanation_lang.code.upper()}}}}}</div>
+"""
+        
+        # CSS styling - universal template for all languages
+        css_style = """
+.card {
+    font-family: 'Segoe UI', 'Microsoft YaHei', '微軟正黑體', Arial, sans-serif;
+    font-size: 20px;
+    text-align: center;
+    color: #2c3e50;
+    background-color: #f9f9f9;
+    padding: 20px;
+    line-height: 1.6;
+}
+
+.card .front {
+    font-size: 28px;
+    font-weight: bold;
+    color: #2980b9;
+    margin-bottom: 15px;
+}
+
+.card .translation {
+    font-size: 22px;
+    color: #27ae60;
+    margin: 15px 0;
+}
+
+.card .grammar,
+.card .synonym {
+    font-size: 16px;
+    color: #7f8c8d;
+    margin: 10px 0;
+    font-style: italic;
+}
+
+.card .example {
+    font-size: 18px;
+    color: #34495e;
+    margin: 12px 0;
+    padding: 8px;
+    background-color: #ecf0f1;
+    border-radius: 4px;
+}
+
+.card .example-translation {
+    font-size: 16px;
+    color: #95a5a6;
+    margin-top: 5px;
+}
+
+.card hr {
+    border: none;
+    border-top: 2px solid #bdc3c7;
+    margin: 20px 0;
+}
+
+.card .audio {
+    margin: 15px 0;
+}
+
+.card .hint,
+.card .extend {
+    font-size: 14px;
+    color: #8e44ad;
+    margin: 10px 0;
+    text-align: left;
+    padding: 10px;
+    background-color: #f4ecf7;
+    border-left: 3px solid #9b59b6;
+    border-radius: 3px;
+}
+"""
+        
+        # Create and save the template
+        template = CardTemplate.objects.create(
+            language=self.target_lang,
+            anki_model_name=model_name,
+            default_deck_name=deck_name,
+            fields_definition=fields,
+            front_template=front_template,
+            back_template=back_template,
+            css_style=css_style,
+        )
+        
+        logger.info(f'Created default template for {self.target_lang.name}: {model_name}')
+        return template
 
     def _run_with_timeout(self, func, timeout, *args, **kwargs):
         """Run a blocking function in a thread and enforce a timeout."""
@@ -278,8 +413,11 @@ class CardPipeline:
         card.extend = result.get('extend', '')
         card.hint = result.get('hint', '')
 
-        # Apply French article rules before TTS
+        # Apply language-specific preprocessing rules before TTS
+        # Currently supports French article/preposition addition
+        # Can be extended for other languages as needed
         if self.target_lang.code == 'fr':
+            # French-specific: Add appropriate article (du/de la/de l') based on gender
             conjugaison_genre = card.conjugaison_genre
             target_word = card.target_word
 
@@ -442,18 +580,34 @@ class CardPipeline:
         # Some Anki models use different casing (e.g. 'Exemple-FR' vs 'exemple-FR'),
         # so query Anki for the actual model field names and use those exact
         # names when constructing the payload.
-        # Prepare a canonical mapping we expect from the pipeline -> model fields
+        
+        # Get language names for field mapping
+        native_name = self.target_lang.native_name or self.target_lang.name
+        explanation_name = self.explanation_lang.name
+        target_code = self.target_lang.code.upper()
+        explanation_code = self.explanation_lang.code.upper()
+        
+        # Build desired_keys dynamically based on current languages
         desired_keys = {
-            'français': 'Français',
-            'english': 'English',
+            native_name.lower(): native_name,
+            explanation_name.lower(): explanation_name,
             'synonyme': 'Synonyme',
+            'synonym': 'Synonyme',
             'conjugaison/gender': 'Conjugaison/Gender',
+            f'exemple-{target_code}'.lower(): f'exemple-{target_code}',
+            f'exemple-{explanation_code}'.lower(): f'exemple-{explanation_code}',
+            f'exemple2-{target_code}'.lower(): f'exemple2-{target_code}',
+            f'exemple2-{explanation_code}'.lower(): f'exemple2-{explanation_code}',
+            'extend': 'Extend',
+            'hint': 'Hint',
+            # Legacy French mappings for backward compatibility
+            'français': 'Français',
+            'french': 'French',
+            'english': 'English',
             'exemple-fr': 'exemple-FR',
             'exemple-en': 'exemple-EN',
             'exemple2-fr': 'exemple2-FR',
             'exemple2-en': 'exemple2-EN',
-            'extend': 'Extend',
-            'hint': 'Hint',
         }
 
         # Query Anki for the actual model field names for this model.
@@ -477,24 +631,28 @@ class CardPipeline:
                         return real
             return None
 
-        # Map pipeline values into the exact model field names
+        # Map pipeline values into the exact model field names (dynamically)
         fields = {}
         mapping = {
-            'Français': card.target_word,
-            'English': card.explanation_word,
+            native_name: card.target_word,
+            explanation_name: card.explanation_word,
             'Synonyme': card.synonyme,
             'Conjugaison/Gender': card.conjugaison_genre,
-            'exemple-FR': card.exemple_target,
-            'exemple-EN': card.exemple_explanation,
-            'exemple2-FR': card.exemple2_target,
-            'exemple2-EN': card.exemple2_explanation,
+            'Audio': '',  # Will be filled by AnkiConnect when audio_files provided
+            f'exemple-{target_code}': card.exemple_target,
+            f'exemple-{explanation_code}': card.exemple_explanation,
+            'Exemple1-Audio': '',  # Will be filled by AnkiConnect
+            f'exemple2-{target_code}': card.exemple2_target,
+            f'exemple2-{explanation_code}': card.exemple2_explanation,
+            'Exemple2-Audio': '',  # Will be filled by AnkiConnect
             'Extend': card.extend,
             'Hint': card.hint,
         }
 
         for k, v in mapping.items():
             actual = pick_actual([k, desired_keys.get(k.lower(), k)]) or k
-            fields[actual] = v
+            # Convert None to empty string - Anki rejects notes with all None values
+            fields[actual] = v if v is not None else ''
  
         # Build audio files dict
         # Determine the exact field names from the template so AnkiConnect
@@ -683,7 +841,7 @@ class CardPipeline:
         # Defensive cleaning: Ensure audio fields are clean before passing to AnkiConnect.
         # This prevents duplicate [sound:...] tags if the field was somehow polluted before.
         for field_name in audio_files.keys():
-            if field_name in fields:
+            if field_name in fields and fields[field_name]:
                 fields[field_name] = re.sub(r'\[sound:.*?\]', '', fields[field_name]).strip()
 
         # Push to Anki
