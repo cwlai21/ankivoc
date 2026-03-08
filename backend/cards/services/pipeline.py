@@ -92,23 +92,23 @@ class CardPipeline:
             'Hint',
         ]
         
-        # Get language-specific icon mapping (for flag images)
-        lang_icon_map = {
-            'fr': 'french.png',
-            'en': 'english.png',
-            'zh': 'china.png',
-            'es': 'spain.png',
-            'de': 'german.png',
-            'ja': 'japan.png',
-            'ko': 'korea.png',
+        # Get language-specific flag emoji (no external images needed)
+        lang_flag_map = {
+            'fr': '🇫🇷',
+            'en': '🇬🇧',
+            'zh': '🇨🇳',
+            'es': '🇪🇸',
+            'de': '🇩🇪',
+            'ja': '🇯🇵',
+            'ko': '🇰🇷',
         }
-        lang_icon = lang_icon_map.get(self.target_lang.code, 'default.png')
+        lang_flag = lang_flag_map.get(self.target_lang.code, '🌐')
         
         # Card 1 template (Reading): Rich format with title bar and styling
         front_template = f"""<div class="TitleBar title-r">
-<img style="width: 20px; height: 20px;padding-right: 5px;" src="{lang_icon}">
+<span style="font-size: 18px; padding-right: 5px;">{lang_flag}</span>
 Reading 
-<img style="width: 20px; height: 20px;padding-right: 5px;" src="{lang_icon}">
+<span style="font-size: 18px; padding-left: 5px;">{lang_flag}</span>
 </div>
 <div class="Tag light-r">
 {{{{#Tags}}}} &nbsp; {{{{Tags}}}} {{{{/Tags}}}}</div> 
