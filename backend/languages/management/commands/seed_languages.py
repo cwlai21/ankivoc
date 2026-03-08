@@ -85,7 +85,7 @@ class Command(BaseCommand):
                     'Français',
                     'English',
                     'Synonyme',
-                    'Conjugaison/Féminin ou masculin',
+                    'Conjugaison/Gender',
                     'audio',
                     'exemple-FR',
                     'exemple-EN',
