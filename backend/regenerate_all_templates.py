@@ -35,10 +35,10 @@ def generate_template_for_language(target_lang, explanation_lang):
         'Audio',
         f'exemple-{target_lang.code.upper()}',
         'exemple-Explanation',
-        'Exemple1-Audio',
+        'exemple1-Audio',
         f'exemple2-{target_lang.code.upper()}',
         'exemple2-Explanation',
-        'Exemple2-Audio',
+        'exemple2-Audio',
         'Extend',
         'Hint',
         'No Spell',
@@ -86,7 +86,7 @@ Reading
 <ul class="light-r2">
 <li class="eB">{{exemple-""" + target_lang.code.upper() + """}}</li>
 <li class="eg">{{exemple-Explanation}}</li>
-{{#Exemple1-Audio}}{{Exemple1-Audio}}{{/Exemple1-Audio}}
+{{#exemple1-Audio}}{{exemple1-Audio}}{{/exemple1-Audio}}
 </ul>
 {{/exemple-""" + target_lang.code.upper() + """}}
 
@@ -94,7 +94,7 @@ Reading
 <ul class="light-r2">
 <li class="eB">{{exemple2-""" + target_lang.code.upper() + """}}</li>
 <li class="eg">{{exemple2-Explanation}}</li>
-{{#Exemple2-Audio}}{{Exemple2-Audio}}{{/Exemple2-Audio}}
+{{#exemple2-Audio}}{{exemple2-Audio}}{{/exemple2-Audio}}
 </ul>
 {{/exemple2-""" + target_lang.code.upper() + """}}
 
@@ -179,9 +179,41 @@ if (document.readyState === 'loading') {{
 }}
 </script>"""
     
-    # Card 2 back template
-    back_template_card2 = """{{FrontSide}}
-<div class="noreplaybutton"> [sound:silence1.mp3] </div>"""
+    # Card 2 back template - show answer with all details
+    back_template_card2 = f"""{{{{FrontSide}}}}
+<div class="noreplaybutton"> [sound:silence1.mp3] </div>
+
+<hr id="answer">
+
+<div class="TitleBar title-r">Answer</div>
+
+<div class="Text_Card radius">
+<div class="Text-answer">{{{{Explanation}}}}</div>
+{{{{#Synonyme}}}}<div class="Synonyme">≈ {{{{Synonyme}}}}</div>{{{{/Synonyme}}}}
+{{{{#Conjugaison/Gender}}}}<div class="Verbform">{{{{Conjugaison/Gender}}}}</div>{{{{/Conjugaison/Gender}}}}
+</div>
+
+{{{{#exemple-{target_lang.code.upper()}}}}}
+<ul class="light-r2">
+<li class="eB">{{{{exemple-{target_lang.code.upper()}}}}}</li>
+<li class="eg">{{{{exemple-Explanation}}}}</li>
+{{{{#exemple1-Audio}}}}{{{{exemple1-Audio}}}}{{{{/exemple1-Audio}}}}
+</ul>
+{{{{/exemple-{target_lang.code.upper()}}}}}
+
+{{{{#exemple2-{target_lang.code.upper()}}}}}
+<ul class="light-r2">
+<li class="eB">{{{{exemple2-{target_lang.code.upper()}}}}}</li>
+<li class="eg">{{{{exemple2-Explanation}}}}</li>
+{{{{#exemple2-Audio}}}}{{{{exemple2-Audio}}}}{{{{/exemple2-Audio}}}}
+</ul>
+{{{{/exemple2-{target_lang.code.upper()}}}}}
+
+{{{{#Extend}}}}
+<div class="extend">
+{{{{Extend}}}}
+</div>
+{{{{/Extend}}}}"""
     
     # CSS (dark theme)
     css = """.card {
@@ -316,6 +348,7 @@ input[type="text"]:focus {
     background-color: #2d1b3d;
     border-left: 4px solid #a855f7;
     border-radius: 4px;
+    line-height: 1.6;
 }
 
 hr#answer {

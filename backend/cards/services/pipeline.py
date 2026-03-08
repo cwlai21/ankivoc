@@ -85,10 +85,10 @@ class CardPipeline:
             'Audio',
             f'exemple-{self.target_lang.code.upper()}',  # e.g., exemple-ES
             'exemple-Explanation',  # Generic example translation
-            'Exemple1-Audio',
+            'exemple1-Audio',
             f'exemple2-{self.target_lang.code.upper()}',
             'exemple2-Explanation',  # Generic example2 translation
-            'Exemple2-Audio',
+            'exemple2-Audio',
             'Extend',
             'Hint',
             'No Spell',  # Controls whether typing practice is disabled
@@ -137,14 +137,14 @@ Reading
 
 {{{{#exemple-{self.target_lang.code.upper()}}}}}
 <ul class="light-r2">
-					<li class="eB">{{{{exemple-{self.target_lang.code.upper()}}}}}{{{{Exemple1-Audio}}}}
+					<li class="eB">{{{{exemple-{self.target_lang.code.upper()}}}}}{{{{exemple1-Audio}}}}
 {{{{/exemple-{self.target_lang.code.upper()}}}}}
 {{{{#exemple-{self.target_lang.code.upper()}}}}}
 					<li class="eg">{{{{exemple-Explanation}}}}
 {{{{/exemple-{self.target_lang.code.upper()}}}}}
 
 {{{{#exemple2-{self.target_lang.code.upper()}}}}}
-					<li class="eB">{{{{exemple2-{self.target_lang.code.upper()}}}}}{{{{Exemple2-Audio}}}}
+					<li class="eB">{{{{exemple2-{self.target_lang.code.upper()}}}}}{{{{exemple2-Audio}}}}
 {{{{/exemple2-{self.target_lang.code.upper()}}}}}{{{{#exemple2-Explanation}}}}
 					<li class="eg">{{{{exemple2-Explanation}}}}
 {{{{/exemple2-Explanation}}}}
@@ -205,9 +205,41 @@ Reading & Spelling
 {self._get_language_specific_script(self.target_lang.code, native_name)}
 </script>"""
         
-        # Card 2 back: Show the front side (Anki will display typed answer automatically)
+        # Card 2 back: Show the front side with full answer
         back_template_card2 = f"""{{{{FrontSide}}}}
-<div class="noreplaybutton"> [sound:silence1.mp3] </div>"""
+<div class="noreplaybutton"> [sound:silence1.mp3] </div>
+
+<hr id="answer">
+
+<div class="TitleBar title-r">Answer</div>
+
+<div class="Text_Card radius">
+<div class="Text-answer">{{{{Explanation}}}}</div>
+{{{{#Synonyme}}}}<div class="Synonyme">≈ {{{{Synonyme}}}}</div>{{{{/Synonyme}}}}
+{{{{#Conjugaison/Gender}}}}<div class="Verbform">{{{{Conjugaison/Gender}}}}</div>{{{{/Conjugaison/Gender}}}}
+</div>
+
+{{{{#exemple-{self.target_lang.code.upper()}}}}}
+<ul class="light-r2">
+<li class="eB">{{{{exemple-{self.target_lang.code.upper()}}}}}</li>
+<li class="eg">{{{{exemple-Explanation}}}}</li>
+{{{{#exemple1-Audio}}}}{{{{exemple1-Audio}}}}{{{{/exemple1-Audio}}}}
+</ul>
+{{{{/exemple-{self.target_lang.code.upper()}}}}}
+
+{{{{#exemple2-{self.target_lang.code.upper()}}}}}
+<ul class="light-r2">
+<li class="eB">{{{{exemple2-{self.target_lang.code.upper()}}}}}</li>
+<li class="eg">{{{{exemple2-Explanation}}}}</li>
+{{{{#exemple2-Audio}}}}{{{{exemple2-Audio}}}}{{{{/exemple2-Audio}}}}
+</ul>
+{{{{/exemple2-{self.target_lang.code.upper()}}}}}
+
+{{{{#Extend}}}}
+<div class="extend">
+{{{{Extend}}}}
+</div>
+{{{{/Extend}}}}"""
         
         # CSS styling - Dark theme optimized for better readability
         css_style = """
@@ -339,15 +371,15 @@ Reading & Spelling
 
 /* Extend/Hint Section */
 .extend {
-    font-size: 13px;
-    color: #9ca3af;
+    font-size: 14px;
+    color: #c084fc;
     margin: 15px 10px;
     text-align: left;
-    padding: 10px;
-    background-color: #262626;
-    border-left: 2px solid #404040;
+    padding: 12px;
+    background-color: #2d1b3d;
+    border-left: 4px solid #a855f7;
     border-radius: 4px;
-    opacity: 0.85;
+    line-height: 1.6;
 }
 
 /* HR Separator */
@@ -946,10 +978,10 @@ else if (word.includes('\uc744') || word.includes('\ub97c')){{ // 을/를
             'Audio': '',  # Will be filled by AnkiConnect when audio_files provided
             f'exemple-{target_code}': card.exemple_target,
             'exemple-Explanation': card.exemple_explanation,  # Generic field
-            'Exemple1-Audio': '',  # Will be filled by AnkiConnect
+            'exemple1-Audio': '',  # Will be filled by AnkiConnect
             f'exemple2-{target_code}': card.exemple2_target,
             'exemple2-Explanation': card.exemple2_explanation,  # Generic field
-            'Exemple2-Audio': '',  # Will be filled by AnkiConnect
+            'exemple2-Audio': '',  # Will be filled by AnkiConnect
             'Extend': card.extend,
             'Hint': card.hint,
         }
