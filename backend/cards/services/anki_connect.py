@@ -128,6 +128,7 @@ class AnkiConnectClient:
     def create_model_if_missing(self, model_name, in_order_fields, card_template=None):
         """
         Create a simple Anki note type (model) if it does not already exist.
+        If model exists, ensure all required fields are present.
 
         Args:
             model_name: Name of the model to ensure exists
@@ -136,6 +137,25 @@ class AnkiConnectClient:
         """
         existing = self.get_model_names()
         if model_name in existing:
+            # Model exists - check if all fields are present
+            try:
+                existing_fields = self._invoke('modelFieldNames', modelName=model_name)
+                if existing_fields:
+                    missing_fields = [f for f in in_order_fields if f not in existing_fields]
+                    if missing_fields:
+                        logger.info(f'Adding missing fields to model {model_name}: {missing_fields}')
+                        for field in missing_fields:
+                            try:
+                                self._invoke('modelFieldAdd', 
+                                    modelName=model_name,
+                                    fieldName=field,
+                                    index=len(existing_fields) + missing_fields.index(field)
+                                )
+                                logger.info(f'Added field "{field}" to model {model_name}')
+                            except Exception as e:
+                                logger.warning(f'Failed to add field "{field}" to model {model_name}: {e}')
+            except Exception as e:
+                logger.warning(f'Could not check/update fields for model {model_name}: {e}')
             return True
 
         # Build dual card templates (Reading + Listening) using the provided fields
@@ -442,8 +462,13 @@ hr#answer {
             Dict with noteId
         """
         # Ensure model exists; try to create a basic one if missing.
+        # Use template fields definition if available, otherwise use actual field keys
         try:
-            created = self.create_model_if_missing(model_name, list(fields.keys()), card_template=card_template)
+            if card_template and hasattr(card_template, 'fields_definition') and card_template.fields_definition:
+                field_list = card_template.fields_definition
+            else:
+                field_list = list(fields.keys())
+            created = self.create_model_if_missing(model_name, field_list, card_template=card_template)
         except Exception:
             created = False
             logger.debug('create_model_if_missing failed or skipped')
@@ -453,6 +478,14 @@ hr#answer {
         if model_name not in existing_models:
             logger.warning(f'Model "{model_name}" not present in Anki; falling back to "Français-(R/L)"')
             model_name = 'Français-(R/L)'
+
+        # Ensure all template-defined fields exist in the fields dict
+        # If card_template is provided, add missing fields as empty strings
+        if card_template and hasattr(card_template, 'fields_definition') and card_template.fields_definition:
+            for field_name in card_template.fields_definition:
+                if field_name not in fields:
+                    fields[field_name] = ''
+                    logger.debug(f'Added missing field "{field_name}" with empty value')
 
         # Map fields to the target model's expected field names.
         #
