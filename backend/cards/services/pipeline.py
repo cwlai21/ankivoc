@@ -1091,6 +1091,7 @@ else if (word.includes('\uc744') || word.includes('\ub97c')){{ // 을/를
             fields=fields,
             audio_files=audio_files if audio_files else None,
             tags=['vocab-builder'],
+            card_template=self.template,
         )
  
         card.anki_note_id = result['noteId']

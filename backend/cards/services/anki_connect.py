@@ -125,13 +125,14 @@ class AnkiConnectClient:
         # If still not present, raise so caller can handle it
         raise AnkiConnectError(f'deck was not found after createDeck: {deck_name}')
 
-    def create_model_if_missing(self, model_name, in_order_fields):
+    def create_model_if_missing(self, model_name, in_order_fields, card_template=None):
         """
         Create a simple Anki note type (model) if it does not already exist.
 
         Args:
             model_name: Name of the model to ensure exists
             in_order_fields: List of field names in order
+            card_template: Optional CardTemplate instance with custom front/back/css
         """
         existing = self.get_model_names()
         if model_name in existing:
@@ -144,11 +145,16 @@ class AnkiConnectClient:
         first = in_order_fields[0]
         second = in_order_fields[1] if len(in_order_fields) > 1 else ''
 
-        # Card 1: Reading card - show target word/phrase
-        qfmt1 = f"<div style='font-size: 24px;'>{{{{{first}}}}}</div>"
-        
-        all_fields_html = ''.join([f"<div><b>{f}</b>: {{{{{f}}}}}</div>" for f in in_order_fields])
-        afmt1 = "{{FrontSide}}<hr id=answer>" + all_fields_html
+        # Use custom templates if provided, otherwise use simple defaults
+        if card_template and card_template.front_template and len(card_template.front_template) > 20:
+            # Use the rich template from CardTemplate
+            qfmt1 = card_template.front_template
+            afmt1 = card_template.back_template
+        else:
+            # Card 1: Reading card - show target word/phrase (fallback)
+            qfmt1 = f"<div style='font-size: 24px;'>{{{{{first}}}}}</div>"
+            all_fields_html = ''.join([f"<div><b>{f}</b>: {{{{{f}}}}}</div>" for f in in_order_fields])
+            afmt1 = "{{FrontSide}}<hr id=answer>" + all_fields_html
 
         # Card 2: Listening card - show audio prompt
         # Find 'Audio' field in the field list
@@ -175,8 +181,12 @@ class AnkiConnectClient:
                 qfmt2 = f"<div style='color: #999;'>What is:</div><br><div style='font-size: 18px;'>{{{{{first}}}}}</div>"
                 afmt2 = "{{FrontSide}}<hr id=answer>" + all_fields_html
 
-        # Advanced CSS template matching French card format
-        css = """.card {
+        # Use custom CSS if provided from CardTemplate, otherwise use advanced default
+        if card_template and card_template.css_style and len(card_template.css_style) > 200:
+            css = card_template.css_style
+        else:
+            # Advanced CSS template matching French card format
+            css = """.card {
     font-family: 'Segoe UI', 'Microsoft YaHei', '微軟正黑體', Arial, sans-serif;
     font-size: 20px;
     text-align: center;
@@ -410,7 +420,7 @@ hr#answer {
         logger.warning('Unable to create model %s with any known parameter shapes', model_name)
         return False
 
-    def add_note(self, deck_name, model_name, fields, audio_files=None, tags=None):
+    def add_note(self, deck_name, model_name, fields, audio_files=None, tags=None, card_template=None):
         """
         Add a single note to Anki.
 
@@ -420,13 +430,14 @@ hr#answer {
             fields: Dict of field name → value
             audio_files: Dict of field name → file path for audio fields
             tags: List of tags to add to the note
+            card_template: Optional CardTemplate instance for custom styling
 
         Returns:
             Dict with noteId
         """
         # Ensure model exists; try to create a basic one if missing.
         try:
-            created = self.create_model_if_missing(model_name, list(fields.keys()))
+            created = self.create_model_if_missing(model_name, list(fields.keys()), card_template=card_template)
         except Exception:
             created = False
             logger.debug('create_model_if_missing failed or skipped')
