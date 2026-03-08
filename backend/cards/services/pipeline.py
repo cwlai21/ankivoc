@@ -155,14 +155,14 @@ Reading
 </div>
 {{{{/Extend}}}}"""
         
-        # CSS styling - advanced template matching French card format
+        # CSS styling - Dark theme optimized for better readability
         css_style = """
 .card {
     font-family: 'Segoe UI', 'Microsoft YaHei', '微軟正黑體', Arial, sans-serif;
     font-size: 20px;
     text-align: center;
-    color: #2c3e50;
-    background-color: #ffffff;
+    color: #e0e0e0;
+    background-color: #1e1e1e;
     padding: 0;
     line-height: 1.6;
 }
@@ -180,13 +180,15 @@ Reading
 }
 
 .title-r {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
+    background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+    color: #ffffff;
+    box-shadow: 0 2px 8px rgba(124, 58, 237, 0.3);
 }
 
 .title-l {
-    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-    color: white;
+    background: linear-gradient(135deg, #ec4899 0%, #f43f5e 100%);
+    color: #ffffff;
+    box-shadow: 0 2px 8px rgba(236, 72, 153, 0.3);
 }
 
 /* Tags */
@@ -197,33 +199,34 @@ Reading
 }
 
 .light-r {
-    background-color: #e8eaf6;
-    color: #5c6bc0;
+    background-color: #2d2d44;
+    color: #9ca3ff;
     border-radius: 4px;
 }
 
 /* Text Card Styling */
 .Text_Card {
-    background-color: #fafafa;
+    background-color: #2a2a2a;
     padding: 20px;
     margin: 10px;
 }
 
 .radius {
     border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
 }
 
 .Text_big {
     font-size: 36px;
     font-weight: bold;
-    color: #1a237e;
+    color: #a5b4fc;
     margin: 20px 0;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.3);
 }
 
 .Text-answer {
     font-size: 28px;
-    color: #2e7d32;
+    color: #86efac;
     margin: 15px 0;
     font-weight: 600;
 }
@@ -231,50 +234,51 @@ Reading
 /* Grammar/Verb Form */
 .Verbform {
     font-size: 16px;
-    color: #757575;
+    color: #9ca3af;
     font-style: italic;
     margin: 10px 0;
 }
 
 /* Gender-specific styling */
 .feminine {
-    border-left: 5px solid #e91e63;
+    border-left: 5px solid #f472b6;
     padding-left: 15px;
 }
 
 .masculine {
-    border-left: 5px solid #2196f3;
+    border-left: 5px solid #60a5fa;
     padding-left: 15px;
 }
 
 .neuter {
-    border-left: 5px solid #4caf50;
+    border-left: 5px solid #6ee7b7;
     padding-left: 15px;
 }
 
 /* Examples List */
 .light-r2 {
-    background-color: #f5f5f5;
+    background-color: #2d2d2d;
     border-radius: 8px;
     padding: 15px 30px;
     margin: 15px 10px;
     text-align: left;
     list-style: none;
+    border: 1px solid #404040;
 }
 
 .eB {
     font-size: 18px;
-    color: #1976d2;
+    color: #93c5fd;
     font-weight: 500;
     margin: 10px 0;
     padding: 8px;
-    background-color: #e3f2fd;
+    background-color: #1e3a5f;
     border-radius: 4px;
 }
 
 .eg {
     font-size: 16px;
-    color: #616161;
+    color: #a1a1aa;
     margin: 5px 0 15px 20px;
     font-style: italic;
 }
@@ -282,26 +286,26 @@ Reading
 /* Extend/Hint Section */
 .extend {
     font-size: 14px;
-    color: #6a1b9a;
+    color: #d8b4fe;
     margin: 15px 10px;
     text-align: left;
     padding: 12px;
-    background-color: #f3e5f5;
-    border-left: 4px solid #9c27b0;
+    background-color: #2d1b3d;
+    border-left: 4px solid #c084fc;
     border-radius: 4px;
 }
 
 /* HR Separator */
 hr#answer {
     border: none;
-    border-top: 3px solid #e0e0e0;
+    border-top: 3px solid #404040;
     margin: 20px 0;
 }
 
 /* Synonyme */
 .card .Synonyme {
     font-size: 16px;
-    color: #00796b;
+    color: #5eead4;
     margin: 10px 0;
     font-style: italic;
 }
