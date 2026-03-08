@@ -246,6 +246,16 @@ hr#answer {
 }""",
 		help_text='Anki card CSS styling'
 	)
+	front_template_card2 = models.TextField(
+		blank=True,
+		default='{{Audio}}',
+		help_text='Anki card 2 (Listening/Spelling) front template (qfmt2)'
+	)
+	back_template_card2 = models.TextField(
+		blank=True,
+		default='{{FrontSide}}\n\n<hr id=answer>\n\n{{TARGET_LANGUAGE}}',
+		help_text='Anki card 2 (Listening/Spelling) back template (afmt2)'
+	)
 
 	class Meta:
 		db_table = 'card_templates'

@@ -91,6 +91,7 @@ class CardPipeline:
             'Exemple2-Audio',
             'Extend',
             'Hint',
+            'No Spell',  # Controls whether typing practice is disabled
         ]
         
         # Get language-specific flag emoji (no external images needed)
@@ -154,6 +155,59 @@ Reading
 {{{{Extend}}}}
 </div>
 {{{{/Extend}}}}"""
+        
+        # Card 2 front: Listening/Spelling card with conditional display
+        # If Audio exists: Listening & Spelling mode
+        # If no Audio: Reading & Spelling mode with Explanation shown
+        front_template_card2 = f"""{{{{#Audio}}}}
+<div class="TitleBar title-l">
+<span style="font-size: 18px; padding-right: 5px;">{lang_flag}</span>
+Listening & Spelling
+<span style="font-size: 18px; padding-left: 5px;">{lang_flag}</span>
+</div>
+<div class="Tag light-r">
+{{{{#Tags}}}} &nbsp; {{{{Tags}}}} {{{{/Tags}}}}</div>
+
+<div class="Text_Card radius">
+<div class="Text_big">{{{{Audio}}}}</div>
+{{{{#Hint}}}}<div class="Verbform" style="color: #818cf8; font-size: 14px;">💡 {{{{Hint}}}}</div>{{{{/Hint}}}}
+</div>
+
+{{{{^No Spell}}}}
+<div class="Text_Card radius">
+<div class="Text-answer">{{{{type:{native_name}}}}}</div>
+</div>
+{{{{/No Spell}}}}
+{{{{/Audio}}}}
+
+{{{{^Audio}}}}
+<div class="TitleBar title-l">
+<span style="font-size: 18px; padding-right: 5px;">{lang_flag}</span>
+Reading & Spelling
+<span style="font-size: 18px; padding-left: 5px;">{lang_flag}</span>
+</div>
+<div class="Tag light-r">
+{{{{#Tags}}}} &nbsp; {{{{Tags}}}} {{{{/Tags}}}}</div>
+
+<div class="Text_Card radius">
+<div class="Text-answer">{{{{Explanation}}}}</div>
+{{{{#Hint}}}}<div class="Verbform" style="color: #818cf8; font-size: 14px;">💡 {{{{Hint}}}}</div>{{{{/Hint}}}}
+</div>
+
+{{{{^No Spell}}}}
+<div class="Text_Card radius">
+<div class="Text-answer">{{{{type:{native_name}}}}}</div>
+</div>
+{{{{/No Spell}}}}
+{{{{/Audio}}}}
+
+<script>
+{self._get_language_specific_script(self.target_lang.code, native_name)}
+</script>"""
+        
+        # Card 2 back: Show the front side (Anki will display typed answer automatically)
+        back_template_card2 = f"""{{{{FrontSide}}}}
+<div class="noreplaybutton"> [sound:silence1.mp3] </div>"""
         
         # CSS styling - Dark theme optimized for better readability
         css_style = """
@@ -326,6 +380,8 @@ hr#answer {
             front_template=front_template,
             back_template=back_template,
             css_style=css_style,
+            front_template_card2=front_template_card2,
+            back_template_card2=back_template_card2,
         )
         
         logger.info(f'Created default template for {self.target_lang.name}: {model_name}')

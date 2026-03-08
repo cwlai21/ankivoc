@@ -156,30 +156,36 @@ class AnkiConnectClient:
             all_fields_html = ''.join([f"<div><b>{f}</b>: {{{{{f}}}}}</div>" for f in in_order_fields])
             afmt1 = "{{FrontSide}}<hr id=answer>" + all_fields_html
 
-        # Card 2: Listening card - show audio prompt
-        # Find 'Audio' field in the field list
-        audio_field = None
-        for f in in_order_fields:
-            if 'audio' in f.lower() and 'exemple' not in f.lower():
-                audio_field = f
-                break
-        
-        if audio_field:
-            # Listening card: play audio, then show answer
-            qfmt2 = f"<div style='font-size: 14px; color: #666;'>🔊 Listen and identify:</div><br>{{{{{audio_field}}}}}"
-            afmt2 = f"{{{{FrontSide}}}}<hr id=answer><div style='font-size: 24px;'>{{{{{first}}}}}</div>"
-            if second:
-                afmt2 += f"<br><div style='font-size: 18px;'>{{{{{second}}}}}</div>"
+        # Card 2: Listening/Spelling card with typing practice
+        # Use custom Card 2 templates if provided, otherwise use simple defaults
+        if card_template and hasattr(card_template, 'front_template_card2') and card_template.front_template_card2 and len(card_template.front_template_card2) > 20:
+            # Use the rich Card 2 template from CardTemplate
+            qfmt2 = card_template.front_template_card2
+            afmt2 = card_template.back_template_card2
         else:
-            # Fallback: Create a different Card 2 that shows translation first
-            # This ensures Card 2 front is never identical to Card 1
-            if second:
-                qfmt2 = f"<div style='font-size: 20px; color: #666;'>Translate to {first}:</div><br><div style='font-size: 24px;'>{{{{{second}}}}}</div>"
+            # Fallback: Find 'Audio' field in the field list
+            audio_field = None
+            for f in in_order_fields:
+                if 'audio' in f.lower() and 'exemple' not in f.lower():
+                    audio_field = f
+                    break
+            
+            if audio_field:
+                # Simple listening card: play audio, then show answer
+                qfmt2 = f"<div style='font-size: 14px; color: #666;'>🔊 Listen and identify:</div><br>{{{{{audio_field}}}}}"
                 afmt2 = f"{{{{FrontSide}}}}<hr id=answer><div style='font-size: 24px;'>{{{{{first}}}}}</div>"
+                if second:
+                    afmt2 += f"<br><div style='font-size: 18px;'>{{{{{second}}}}}</div>"
             else:
-                # If only one field, make Card 2 show a hint
-                qfmt2 = f"<div style='color: #999;'>What is:</div><br><div style='font-size: 18px;'>{{{{{first}}}}}</div>"
-                afmt2 = "{{FrontSide}}<hr id=answer>" + all_fields_html
+                # Fallback: Create a different Card 2 that shows translation first
+                # This ensures Card 2 front is never identical to Card 1
+                if second:
+                    qfmt2 = f"<div style='font-size: 20px; color: #666;'>Translate to {first}:</div><br><div style='font-size: 24px;'>{{{{{second}}}}}</div>"
+                    afmt2 = f"{{{{FrontSide}}}}<hr id=answer><div style='font-size: 24px;'>{{{{{first}}}}}</div>"
+                else:
+                    # If only one field, make Card 2 show a hint
+                    qfmt2 = f"<div style='color: #999;'>What is:</div><br><div style='font-size: 18px;'>{{{{{first}}}}}</div>"
+                    afmt2 = "{{FrontSide}}<hr id=answer>" + all_fields_html
 
         # Use custom CSS if provided from CardTemplate, otherwise use advanced default
         if card_template and card_template.css_style and len(card_template.css_style) > 200:
