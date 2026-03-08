@@ -285,14 +285,15 @@ Reading
 
 /* Extend/Hint Section */
 .extend {
-    font-size: 14px;
-    color: #d8b4fe;
+    font-size: 13px;
+    color: #9ca3af;
     margin: 15px 10px;
     text-align: left;
-    padding: 12px;
-    background-color: #2d1b3d;
-    border-left: 4px solid #c084fc;
+    padding: 10px;
+    background-color: #262626;
+    border-left: 2px solid #404040;
     border-radius: 4px;
+    opacity: 0.85;
 }
 
 /* HR Separator */
