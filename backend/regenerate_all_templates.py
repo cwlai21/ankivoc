@@ -132,12 +132,6 @@ Listening & Spelling
 <div class="Text_big">{{{{Audio}}}}</div>
 {{{{#Hint}}}}<div class="Verbform" style="color: #818cf8; font-size: 14px;">💡 {{{{Hint}}}}</div>{{{{/Hint}}}}
 </div>
-
-{{{{^No Spell}}}}
-<div class="Text_Card radius">
-<div class="Text-answer">{{{{type:{native_name}}}}}</div>
-</div>
-{{{{/No Spell}}}}
 {{{{/Audio}}}}
 
 {{{{^Audio}}}}
@@ -153,45 +147,7 @@ Reading & Spelling
 <div class="Text-answer">{{{{Explanation}}}}</div>
 {{{{#Hint}}}}<div class="Verbform" style="color: #818cf8; font-size: 14px;">💡 {{{{Hint}}}}</div>{{{{/Hint}}}}
 </div>
-
-{{{{^No Spell}}}}
-<div class="Text_Card radius">
-<div class="Text-answer">{{{{type:{native_name}}}}}</div>
-</div>
-{{{{/No Spell}}}}
-{{{{/Audio}}}}
-
-<script>
-// Language-specific input validation
-window.ankiTypingValidation = function() {{
-    const input = document.querySelector('input[type="text"]');
-    if (!input) return;
-    
-    const normalize = (text) => {{
-        return text.toLowerCase()
-            .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-            .replace(/\\s+/g, ' ').trim();
-    }};
-    
-    input.addEventListener('input', function() {{
-        const val = normalize(this.value);
-        const expected = normalize(this.getAttribute('data-expected') || '');
-        if (val === expected) {{
-            this.style.borderColor = '#4ade80';
-            this.style.boxShadow = '0 0 0 2px rgba(74,222,128,0.2)';
-        }} else {{
-            this.style.borderColor = '';
-            this.style.boxShadow = '';
-        }}
-    }});
-}};
-
-if (document.readyState === 'loading') {{
-    document.addEventListener('DOMContentLoaded', window.ankiTypingValidation);
-}} else {{
-    window.ankiTypingValidation();
-}}
-</script>"""
+{{{{/Audio}}}}"""
     
     # Card 2 back template - aligned with Card 1 format
     back_template_card2 = f"""{{{{FrontSide}}}}
@@ -317,9 +273,12 @@ input[type="text"]:focus {
 }
 
 .Verbform {
-    font-size: 14px;
+    font-size: 20px;
     color: #fbbf24;
     margin: 8px 0;
+    max-width: 800px;
+    line-height: 1.5;
+    word-wrap: break-word;
 }
 
 .light-r2 {
@@ -332,32 +291,40 @@ input[type="text"]:focus {
 }
 
 .eB {
-    font-size: 18px;
-    color: #60a5fa;
+    font-size: 22px;
+    color: #1976d2;
     font-weight: 500;
     margin: 10px 0;
     padding: 8px;
-    background-color: #1e3a5f;
+    background-color: transparent;
     border-radius: 4px;
+    max-width: 800px;
+    line-height: 1.4;
+    word-wrap: break-word;
 }
 
 .eg {
-    font-size: 16px;
+    font-size: 20px;
     color: #9ca3af;
     margin: 5px 0 15px 20px;
     font-style: italic;
+    max-width: 800px;
+    line-height: 1.4;
+    word-wrap: break-word;
 }
 
 .extend {
-    font-size: 14px;
+    font-size: 18px;
     color: #c084fc;
     margin: 15px 10px;
     text-align: left;
     padding: 12px;
-    background-color: #2d1b3d;
+    background-color: transparent;
     border-left: 4px solid #a855f7;
     border-radius: 4px;
     line-height: 1.6;
+    max-width: 800px;
+    word-wrap: break-word;
 }
 
 hr#answer {

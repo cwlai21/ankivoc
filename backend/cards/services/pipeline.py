@@ -172,12 +172,6 @@ Listening & Spelling
 <div class="Text_big">{{{{Audio}}}}</div>
 {{{{#Hint}}}}<div class="Verbform" style="color: #818cf8; font-size: 14px;">💡 {{{{Hint}}}}</div>{{{{/Hint}}}}
 </div>
-
-{{{{^No Spell}}}}
-<div class="Text_Card radius">
-<div class="Text-answer">{{{{type:{native_name}}}}}</div>
-</div>
-{{{{/No Spell}}}}
 {{{{/Audio}}}}
 
 {{{{^Audio}}}}
@@ -193,17 +187,7 @@ Reading & Spelling
 <div class="Text-answer">{{{{Explanation}}}}</div>
 {{{{#Hint}}}}<div class="Verbform" style="color: #818cf8; font-size: 14px;">💡 {{{{Hint}}}}</div>{{{{/Hint}}}}
 </div>
-
-{{{{^No Spell}}}}
-<div class="Text_Card radius">
-<div class="Text-answer">{{{{type:{native_name}}}}}</div>
-</div>
-{{{{/No Spell}}}}
-{{{{/Audio}}}}
-
-<script>
-{self._get_language_specific_script(self.target_lang.code, native_name)}
-</script>"""
+{{{{/Audio}}}}"""
         
         # Card 2 back: Show the front side with full answer - aligned with Card 1 format
         back_template_card2 = f"""{{{{FrontSide}}}}
@@ -314,10 +298,13 @@ Reading & Spelling
 
 /* Grammar/Verb Form */
 .Verbform {
-    font-size: 16px;
+    font-size: 20px;
     color: #9ca3af;
     font-style: italic;
     margin: 10px 0;
+    max-width: 800px;
+    line-height: 1.5;
+    word-wrap: break-word;
 }
 
 /* Gender-specific styling */
@@ -348,33 +335,41 @@ Reading & Spelling
 }
 
 .eB {
-    font-size: 18px;
+    font-size: 22px;
     color: #93c5fd;
     font-weight: 500;
     margin: 10px 0;
     padding: 8px;
-    background-color: #1e3a5f;
+    background-color: transparent;
     border-radius: 4px;
+    max-width: 800px;
+    line-height: 1.4;
+    word-wrap: break-word;
 }
 
 .eg {
-    font-size: 16px;
+    font-size: 20px;
     color: #a1a1aa;
     margin: 5px 0 15px 20px;
     font-style: italic;
+    max-width: 800px;
+    line-height: 1.4;
+    word-wrap: break-word;
 }
 
 /* Extend/Hint Section */
 .extend {
-    font-size: 14px;
+    font-size: 18px;
     color: #c084fc;
     margin: 15px 10px;
     text-align: left;
     padding: 12px;
-    background-color: #2d1b3d;
+    background-color: transparent;
     border-left: 4px solid #a855f7;
     border-radius: 4px;
     line-height: 1.6;
+    max-width: 800px;
+    word-wrap: break-word;
 }
 
 /* HR Separator */

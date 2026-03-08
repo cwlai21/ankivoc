@@ -285,10 +285,13 @@ class AnkiConnectClient:
 
 /* Grammar/Verb Form */
 .Verbform {
-    font-size: 16px;
+    font-size: 20px;
     color: #757575;
     font-style: italic;
     margin: 10px 0;
+    max-width: 800px;
+    line-height: 1.5;
+    word-wrap: break-word;
 }
 
 /* Gender-specific styling */
@@ -318,32 +321,39 @@ class AnkiConnectClient:
 }
 
 .eB {
-    font-size: 18px;
+    font-size: 22px;
     color: #1976d2;
     font-weight: 500;
     margin: 10px 0;
     padding: 8px;
-    background-color: #e3f2fd;
+    background-color: transparent;
     border-radius: 4px;
+    max-width: 800px;
+    line-height: 1.4;
+    word-wrap: break-word;
 }
 
 .eg {
     font-size: 16px;
     color: #616161;
     margin: 5px 0 15px 20px;
-    font-style: italic;
-}
+    font-style: italic;    max-width: 800px;
+    line-height: 1.4;
+    word-wrap: break-word;}
 
 /* Extend/Hint Section */
 .extend {
-    font-size: 14px;
+    font-size: 18px;
     color: #6a1b9a;
     margin: 15px 10px;
     text-align: left;
     padding: 12px;
-    background-color: #f3e5f5;
+    background-color: transparent;
     border-left: 4px solid #9c27b0;
     border-radius: 4px;
+    max-width: 800px;
+    line-height: 1.5;
+    word-wrap: break-word;
 }
 
 /* HR Separator */
