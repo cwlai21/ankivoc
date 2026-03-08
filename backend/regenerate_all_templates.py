@@ -56,7 +56,7 @@ def generate_template_for_language(target_lang, explanation_lang):
     }
     lang_flag = lang_flag_map.get(target_lang.code, '🌍')
     
-    # Card 1 front template (existing)
+    # Card 1 front template - Display target word
     front_template_card1 = f"""<div class="TitleBar title-r">
 <span style="font-size: 18px; padding-right: 5px;">{lang_flag}</span>
 Reading
@@ -66,8 +66,26 @@ Reading
 {{{{#Tags}}}} &nbsp; {{{{Tags}}}} {{{{/Tags}}}}</div>
 
 <div class="Text_Card radius">
-<div class="Text_big">{{{{Audio}}}}{{{{#Extend}}}}{{{{/Extend}}}}</div>
-</div>"""
+<div id="register" class="Text_big">{{{{{native_name}}}}}</div>
+{{{{#Conjugaison/Gender}}}}<div class="Verbform">{{{{Conjugaison/Gender}}}}</div>{{{{/Conjugaison/Gender}}}}
+{{{{Audio}}}}
+</div>
+
+<script>
+// Language-specific card initialization
+window.ankiCardInit = function() {{
+    const textBig = document.querySelector('.Text_big');
+    if (textBig) {{
+        textBig.style.fontSize = '36px';
+    }}
+}};
+
+if (document.readyState === 'loading') {{
+    document.addEventListener('DOMContentLoaded', window.ankiCardInit);
+}} else {{
+    window.ankiCardInit();
+}}
+</script>"""
     
     # Card 1 back template (existing)
     back_template_card1 = """{{FrontSide}}
