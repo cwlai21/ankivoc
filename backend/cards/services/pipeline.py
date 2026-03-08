@@ -75,18 +75,19 @@ class CardPipeline:
         # Build deck name: <NativeLanguageName>::Vocabulary
         deck_name = f"{native_name}::Vocabulary"
         
-        # Define field list using dynamic language names
+        # Define field list using generic names (explanation-language agnostic)
+        # This ensures the same model works with different explanation languages
         fields = [
             native_name,  # Target language word (e.g., "Español")
-            explanation_name,  # Explanation language (e.g., "English")
+            'Explanation',  # Generic explanation field (works with any language)
             'Synonyme',
             'Conjugaison/Gender',
             'Audio',
             f'exemple-{self.target_lang.code.upper()}',  # e.g., exemple-ES
-            f'exemple-{self.explanation_lang.code.upper()}',  # e.g., exemple-EN
+            'exemple-Explanation',  # Generic example translation
             'Exemple1-Audio',
             f'exemple2-{self.target_lang.code.upper()}',
-            f'exemple2-{self.explanation_lang.code.upper()}',
+            'exemple2-Explanation',  # Generic example2 translation
             'Exemple2-Audio',
             'Extend',
             'Hint',
@@ -128,7 +129,7 @@ Reading
 <div class="noreplaybutton"> [sound:silence1.mp3] </div>
 <div class="Text_Card radius"><hr id=answer>
 <div class="Text-answer">
-{{{{{explanation_name}}}}}
+{{{{Explanation}}}}
 </div>
 {{{{Synonyme}}}}
 </div>
@@ -138,14 +139,14 @@ Reading
 					<li class="eB">{{{{exemple-{self.target_lang.code.upper()}}}}}{{{{Exemple1-Audio}}}}
 {{{{/exemple-{self.target_lang.code.upper()}}}}}
 {{{{#exemple-{self.target_lang.code.upper()}}}}}
-					<li class="eg">{{{{exemple-{self.explanation_lang.code.upper()}}}}}
+					<li class="eg">{{{{exemple-Explanation}}}}
 {{{{/exemple-{self.target_lang.code.upper()}}}}}
 
 {{{{#exemple2-{self.target_lang.code.upper()}}}}}
 					<li class="eB">{{{{exemple2-{self.target_lang.code.upper()}}}}}{{{{Exemple2-Audio}}}}
-{{{{/exemple2-{self.target_lang.code.upper()}}}}}{{{{#exemple2-{self.explanation_lang.code.upper()}}}}}
-					<li class="eg">{{{{exemple2-{self.explanation_lang.code.upper()}}}}}
-{{{{/exemple2-{self.explanation_lang.code.upper()}}}}}
+{{{{/exemple2-{self.target_lang.code.upper()}}}}}{{{{#exemple2-Explanation}}}}
+					<li class="eg">{{{{exemple2-Explanation}}}}
+{{{{/exemple2-Explanation}}}}
 </ul>
 
 {{{{#Extend}}}}
@@ -830,24 +831,27 @@ else if (word.includes('\uc744') || word.includes('\ub97c')){{ // 을/를
         # Build desired_keys dynamically based on current languages
         desired_keys = {
             native_name.lower(): native_name,
-            explanation_name.lower(): explanation_name,
+            explanation_name.lower(): 'Explanation',  # Map to generic field
+            'explanation': 'Explanation',  # Generic field
             'synonyme': 'Synonyme',
             'synonym': 'Synonyme',
             'conjugaison/gender': 'Conjugaison/Gender',
             f'exemple-{target_code}'.lower(): f'exemple-{target_code}',
-            f'exemple-{explanation_code}'.lower(): f'exemple-{explanation_code}',
+            'exemple-explanation': 'exemple-Explanation',  # Generic field
+            f'exemple-{explanation_code}'.lower(): 'exemple-Explanation',  # Map to generic
             f'exemple2-{target_code}'.lower(): f'exemple2-{target_code}',
-            f'exemple2-{explanation_code}'.lower(): f'exemple2-{explanation_code}',
+            'exemple2-explanation': 'exemple2-Explanation',  # Generic field
+            f'exemple2-{explanation_code}'.lower(): 'exemple2-Explanation',  # Map to generic
             'extend': 'Extend',
             'hint': 'Hint',
             # Legacy French mappings for backward compatibility
             'français': 'Français',
             'french': 'French',
-            'english': 'English',
-            'exemple-fr': 'exemple-FR',
-            'exemple-en': 'exemple-EN',
-            'exemple2-fr': 'exemple2-FR',
-            'exemple2-en': 'exemple2-EN',
+            'english': 'Explanation',  # Map to generic
+            'exemple-fr': 'exemple-Explanation',
+            'exemple-en': 'exemple-Explanation',
+            'exemple2-fr': 'exemple2-Explanation',
+            'exemple2-en': 'exemple2-Explanation',
         }
 
         # Query Anki for the actual model field names for this model.
@@ -875,15 +879,15 @@ else if (word.includes('\uc744') || word.includes('\ub97c')){{ // 을/를
         fields = {}
         mapping = {
             native_name: card.target_word,
-            explanation_name: card.explanation_word,
+            'Explanation': card.explanation_word,  # Generic field for any explanation language
             'Synonyme': card.synonyme,
             'Conjugaison/Gender': card.conjugaison_genre,
             'Audio': '',  # Will be filled by AnkiConnect when audio_files provided
             f'exemple-{target_code}': card.exemple_target,
-            f'exemple-{explanation_code}': card.exemple_explanation,
+            'exemple-Explanation': card.exemple_explanation,  # Generic field
             'Exemple1-Audio': '',  # Will be filled by AnkiConnect
             f'exemple2-{target_code}': card.exemple2_target,
-            f'exemple2-{explanation_code}': card.exemple2_explanation,
+            'exemple2-Explanation': card.exemple2_explanation,  # Generic field
             'Exemple2-Audio': '',  # Will be filled by AnkiConnect
             'Extend': card.extend,
             'Hint': card.hint,
