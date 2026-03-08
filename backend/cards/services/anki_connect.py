@@ -175,73 +175,159 @@ class AnkiConnectClient:
                 qfmt2 = f"<div style='color: #999;'>What is:</div><br><div style='font-size: 18px;'>{{{{{first}}}}}</div>"
                 afmt2 = "{{FrontSide}}<hr id=answer>" + all_fields_html
 
-        # Universal CSS template for all languages
+        # Advanced CSS template matching French card format
         css = """.card {
     font-family: 'Segoe UI', 'Microsoft YaHei', '微軟正黑體', Arial, sans-serif;
     font-size: 20px;
     text-align: center;
     color: #2c3e50;
-    background-color: #f9f9f9;
-    padding: 20px;
+    background-color: #ffffff;
+    padding: 0;
     line-height: 1.6;
 }
 
-.card .front {
-    font-size: 28px;
+/* Title Bar Styling */
+.TitleBar {
+    padding: 10px;
     font-weight: bold;
-    color: #2980b9;
+    font-size: 16px;
+    border-radius: 8px 8px 0 0;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.title-r {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.title-l {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    color: white;
+}
+
+/* Tags */
+.Tag {
+    padding: 8px;
+    font-size: 12px;
     margin-bottom: 15px;
 }
 
-.card .translation {
-    font-size: 22px;
-    color: #27ae60;
-    margin: 15px 0;
+.light-r {
+    background-color: #e8eaf6;
+    color: #5c6bc0;
+    border-radius: 4px;
 }
 
-.card .grammar,
-.card .synonym {
+/* Text Card Styling */
+.Text_Card {
+    background-color: #fafafa;
+    padding: 20px;
+    margin: 10px;
+}
+
+.radius {
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.Text_big {
+    font-size: 36px;
+    font-weight: bold;
+    color: #1a237e;
+    margin: 20px 0;
+}
+
+.Text-answer {
+    font-size: 28px;
+    color: #2e7d32;
+    margin: 15px 0;
+    font-weight: 600;
+}
+
+/* Grammar/Verb Form */
+.Verbform {
     font-size: 16px;
-    color: #7f8c8d;
+    color: #757575;
+    font-style: italic;
+    margin: 10px 0;
+}
+
+/* Gender-specific styling */
+.feminine {
+    border-left: 5px solid #e91e63;
+    padding-left: 15px;
+}
+
+.masculine {
+    border-left: 5px solid #2196f3;
+    padding-left: 15px;
+}
+
+.neuter {
+    border-left: 5px solid #4caf50;
+    padding-left: 15px;
+}
+
+/* Examples List */
+.light-r2 {
+    background-color: #f5f5f5;
+    border-radius: 8px;
+    padding: 15px 30px;
+    margin: 15px 10px;
+    text-align: left;
+    list-style: none;
+}
+
+.eB {
+    font-size: 18px;
+    color: #1976d2;
+    font-weight: 500;
+    margin: 10px 0;
+    padding: 8px;
+    background-color: #e3f2fd;
+    border-radius: 4px;
+}
+
+.eg {
+    font-size: 16px;
+    color: #616161;
+    margin: 5px 0 15px 20px;
+    font-style: italic;
+}
+
+/* Extend/Hint Section */
+.extend {
+    font-size: 14px;
+    color: #6a1b9a;
+    margin: 15px 10px;
+    text-align: left;
+    padding: 12px;
+    background-color: #f3e5f5;
+    border-left: 4px solid #9c27b0;
+    border-radius: 4px;
+}
+
+/* HR Separator */
+hr#answer {
+    border: none;
+    border-top: 3px solid #e0e0e0;
+    margin: 20px 0;
+}
+
+/* Synonyme */
+.card .Synonyme {
+    font-size: 16px;
+    color: #00796b;
     margin: 10px 0;
     font-style: italic;
 }
 
-.card .example {
-    font-size: 18px;
-    color: #34495e;
-    margin: 12px 0;
-    padding: 8px;
-    background-color: #ecf0f1;
-    border-radius: 4px;
-}
-
-.card .example-translation {
-    font-size: 16px;
-    color: #95a5a6;
-    margin-top: 5px;
-}
-
-.card hr {
-    border: none;
-    border-top: 2px solid #bdc3c7;
-    margin: 20px 0;
-}
-
-.card .audio {
-    margin: 15px 0;
-}
-
-.card .hint,
-.card .extend {
-    font-size: 14px;
-    color: #8e44ad;
-    margin: 10px 0;
-    text-align: left;
-    padding: 10px;
-    background-color: #f4ecf7;
-    border-left: 3px solid #9b59b6;
-    border-radius: 3px;
+/* No Replay Button */
+.noreplaybutton {
+    display: none;
 }
 """
         

@@ -92,87 +92,222 @@ class CardPipeline:
             'Hint',
         ]
         
-        # Card 1 template (Reading): Show target word
-        front_template = f"{{{{{native_name}}}}}"
+        # Get language-specific icon mapping (for flag images)
+        lang_icon_map = {
+            'fr': 'french.png',
+            'en': 'english.png',
+            'zh': 'china.png',
+            'es': 'spain.png',
+            'de': 'german.png',
+            'ja': 'japan.png',
+            'ko': 'korea.png',
+        }
+        lang_icon = lang_icon_map.get(self.target_lang.code, 'default.png')
         
-        # Card 1 back: Show everything
+        # Card 1 template (Reading): Rich format with title bar and styling
+        front_template = f"""<div class="TitleBar title-r">
+<img style="width: 20px; height: 20px;padding-right: 5px;" src="{lang_icon}">
+Reading 
+<img style="width: 20px; height: 20px;padding-right: 5px;" src="{lang_icon}">
+</div>
+<div class="Tag light-r">
+{{{{#Tags}}}} &nbsp; {{{{Tags}}}} {{{{/Tags}}}}</div> 
+
+<div class="Text_Card radius">
+<div id="register" class="Text_big">{{{{{native_name}}}}}</div>
+{{{{#Conjugaison/Gender}}}}<div class="Verbform">{{{{Conjugaison/Gender}}}}{{{{/Conjugaison/Gender}}}}</br>{{{{Audio}}}}
+</div>
+</div>
+
+<script>
+{self._get_language_specific_script(self.target_lang.code, native_name)}
+</script>"""
+        
+        # Card 1 back: Show everything with rich formatting
         back_template = f"""{{{{FrontSide}}}}
-<hr id=answer>
-<div style="font-size: 24px;">{{{{{explanation_name}}}}}</div>
-<div style="margin-top: 10px; color: #666;">{{{{Synonyme}}}}</div>
-<div style="margin-top: 10px; color: #666;">{{{{Conjugaison/Gender}}}}</div>
-<div style="margin-top: 15px;">{{{{exemple-{self.target_lang.code.upper()}}}}}</div>
-<div style="color: #888;">{{{{exemple-{self.explanation_lang.code.upper()}}}}}</div>
-"""
+<div class="noreplaybutton"> [sound:silence1.mp3] </div>
+<div class="Text_Card radius"><hr id=answer>
+<div class="Text-answer">
+{{{{{explanation_name}}}}}
+</div>
+{{{{Synonyme}}}}
+</div>
+
+{{{{#exemple-{self.target_lang.code.upper()}}}}}
+<ul class="light-r2">
+					<li class="eB">{{{{exemple-{self.target_lang.code.upper()}}}}}{{{{Exemple1-Audio}}}}
+{{{{/exemple-{self.target_lang.code.upper()}}}}}
+{{{{#exemple-{self.target_lang.code.upper()}}}}}
+					<li class="eg">{{{{exemple-{self.explanation_lang.code.upper()}}}}}
+{{{{/exemple-{self.target_lang.code.upper()}}}}}
+
+{{{{#exemple2-{self.target_lang.code.upper()}}}}}
+					<li class="eB">{{{{exemple2-{self.target_lang.code.upper()}}}}}{{{{Exemple2-Audio}}}}
+{{{{/exemple2-{self.target_lang.code.upper()}}}}}{{{{#exemple2-{self.explanation_lang.code.upper()}}}}}
+					<li class="eg">{{{{exemple2-{self.explanation_lang.code.upper()}}}}}
+{{{{/exemple2-{self.explanation_lang.code.upper()}}}}}
+</ul>
+
+{{{{#Extend}}}}
+<div class="extend">
+{{{{Extend}}}}
+</div>
+{{{{/Extend}}}}"""
         
-        # CSS styling - universal template for all languages
+        # CSS styling - advanced template matching French card format
         css_style = """
 .card {
     font-family: 'Segoe UI', 'Microsoft YaHei', '微軟正黑體', Arial, sans-serif;
     font-size: 20px;
     text-align: center;
     color: #2c3e50;
-    background-color: #f9f9f9;
-    padding: 20px;
+    background-color: #ffffff;
+    padding: 0;
     line-height: 1.6;
 }
 
-.card .front {
-    font-size: 28px;
+/* Title Bar Styling */
+.TitleBar {
+    padding: 10px;
     font-weight: bold;
-    color: #2980b9;
+    font-size: 16px;
+    border-radius: 8px 8px 0 0;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.title-r {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.title-l {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    color: white;
+}
+
+/* Tags */
+.Tag {
+    padding: 8px;
+    font-size: 12px;
     margin-bottom: 15px;
 }
 
-.card .translation {
-    font-size: 22px;
-    color: #27ae60;
-    margin: 15px 0;
+.light-r {
+    background-color: #e8eaf6;
+    color: #5c6bc0;
+    border-radius: 4px;
 }
 
-.card .grammar,
-.card .synonym {
+/* Text Card Styling */
+.Text_Card {
+    background-color: #fafafa;
+    padding: 20px;
+    margin: 10px;
+}
+
+.radius {
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.Text_big {
+    font-size: 36px;
+    font-weight: bold;
+    color: #1a237e;
+    margin: 20px 0;
+}
+
+.Text-answer {
+    font-size: 28px;
+    color: #2e7d32;
+    margin: 15px 0;
+    font-weight: 600;
+}
+
+/* Grammar/Verb Form */
+.Verbform {
     font-size: 16px;
-    color: #7f8c8d;
+    color: #757575;
+    font-style: italic;
+    margin: 10px 0;
+}
+
+/* Gender-specific styling */
+.feminine {
+    border-left: 5px solid #e91e63;
+    padding-left: 15px;
+}
+
+.masculine {
+    border-left: 5px solid #2196f3;
+    padding-left: 15px;
+}
+
+.neuter {
+    border-left: 5px solid #4caf50;
+    padding-left: 15px;
+}
+
+/* Examples List */
+.light-r2 {
+    background-color: #f5f5f5;
+    border-radius: 8px;
+    padding: 15px 30px;
+    margin: 15px 10px;
+    text-align: left;
+    list-style: none;
+}
+
+.eB {
+    font-size: 18px;
+    color: #1976d2;
+    font-weight: 500;
+    margin: 10px 0;
+    padding: 8px;
+    background-color: #e3f2fd;
+    border-radius: 4px;
+}
+
+.eg {
+    font-size: 16px;
+    color: #616161;
+    margin: 5px 0 15px 20px;
+    font-style: italic;
+}
+
+/* Extend/Hint Section */
+.extend {
+    font-size: 14px;
+    color: #6a1b9a;
+    margin: 15px 10px;
+    text-align: left;
+    padding: 12px;
+    background-color: #f3e5f5;
+    border-left: 4px solid #9c27b0;
+    border-radius: 4px;
+}
+
+/* HR Separator */
+hr#answer {
+    border: none;
+    border-top: 3px solid #e0e0e0;
+    margin: 20px 0;
+}
+
+/* Synonyme */
+.card .Synonyme {
+    font-size: 16px;
+    color: #00796b;
     margin: 10px 0;
     font-style: italic;
 }
 
-.card .example {
-    font-size: 18px;
-    color: #34495e;
-    margin: 12px 0;
-    padding: 8px;
-    background-color: #ecf0f1;
-    border-radius: 4px;
-}
-
-.card .example-translation {
-    font-size: 16px;
-    color: #95a5a6;
-    margin-top: 5px;
-}
-
-.card hr {
-    border: none;
-    border-top: 2px solid #bdc3c7;
-    margin: 20px 0;
-}
-
-.card .audio {
-    margin: 15px 0;
-}
-
-.card .hint,
-.card .extend {
-    font-size: 14px;
-    color: #8e44ad;
-    margin: 10px 0;
-    text-align: left;
-    padding: 10px;
-    background-color: #f4ecf7;
-    border-left: 3px solid #9b59b6;
-    border-radius: 3px;
+/* No Replay Button */
+.noreplaybutton {
+    display: none;
 }
 """
         
@@ -189,6 +324,111 @@ class CardPipeline:
         
         logger.info(f'Created default template for {self.target_lang.name}: {model_name}')
         return template
+
+    def _get_language_specific_script(self, lang_code, field_name):
+        """
+        Generate language-specific JavaScript logic for card front.
+        
+        Args:
+            lang_code: Language code (e.g., 'fr', 'zh', 'es')
+            field_name: The field name to check (e.g., 'Français', '中文')
+            
+        Returns:
+            JavaScript code string
+        """
+        if lang_code == 'fr':
+            # French: Detect gender by article (de la, du, des)
+            return f'''
+if ("{{{{{field_name}}}}}".startsWith('de la ')){{
+    document.getElementById('register').classList.add('feminine');
+}}
+else if ("{{{{{field_name}}}}}".startsWith('du ')){{
+    document.getElementById('register').classList.add('masculine');
+}}
+else if ("{{{{{field_name}}}}}".startsWith('des ')){{
+    document.getElementById('register').classList.add('neuter');
+}}
+else if ("{{{{{field_name}}}}}".startsWith('la ')){{
+    document.getElementById('register').classList.add('feminine');
+}}
+else if ("{{{{{field_name}}}}}".startsWith('le ')){{
+    document.getElementById('register').classList.add('masculine');
+}}
+else if ("{{{{{field_name}}}}}".startsWith('les ')){{
+    document.getElementById('register').classList.add('neuter');
+}}
+'''
+        elif lang_code == 'es':
+            # Spanish: Detect gender by article (la, el, las, los)
+            return f'''
+if ("{{{{{field_name}}}}}".startsWith('la ')){{
+    document.getElementById('register').classList.add('feminine');
+}}
+else if ("{{{{{field_name}}}}}".startsWith('el ')){{
+    document.getElementById('register').classList.add('masculine');
+}}
+else if ("{{{{{field_name}}}}}".startsWith('las ')){{
+    document.getElementById('register').classList.add('feminine');
+}}
+else if ("{{{{{field_name}}}}}".startsWith('los ')){{
+    document.getElementById('register').classList.add('masculine');
+}}
+'''
+        elif lang_code == 'de':
+            # German: Detect gender by article (die, der, das)
+            return f'''
+if ("{{{{{field_name}}}}}".startsWith('die ')){{
+    document.getElementById('register').classList.add('feminine');
+}}
+else if ("{{{{{field_name}}}}}".startsWith('der ')){{
+    document.getElementById('register').classList.add('masculine');
+}}
+else if ("{{{{{field_name}}}}}".startsWith('das ')){{
+    document.getElementById('register').classList.add('neuter');
+}}
+'''
+        elif lang_code == 'zh':
+            # Chinese: Detect measure words (個/个, 位, 本, 張/张, etc.)
+            return f'''
+var word = "{{{{{field_name}}}}}";
+// Common measure words highlighting
+if (word.includes('\u500b') || word.includes('\u4e2a')){{ // 個/个 (general)
+    document.getElementById('register').classList.add('masculine');
+}}
+else if (word.includes('\u4f4d')){{ // 位 (people, polite)
+    document.getElementById('register').classList.add('feminine');
+}}
+else if (word.includes('\u672c')){{ // 本 (books)
+    document.getElementById('register').classList.add('neuter');
+}}
+'''
+        elif lang_code == 'ja':
+            # Japanese: Detect particles or word types
+            return f'''
+var word = "{{{{{field_name}}}}}";
+// Basic particle detection (hiragana particles)
+if (word.includes('\u306f') || word.includes('\u304c')){{ // は or が
+    document.getElementById('register').classList.add('masculine');
+}}
+else if (word.includes('\u3092')){{ // を
+    document.getElementById('register').classList.add('feminine');
+}}
+'''
+        elif lang_code == 'ko':
+            # Korean: Detect particles
+            return f'''
+var word = "{{{{{field_name}}}}}";
+// Korean particles
+if (word.includes('\uc740') || word.includes('\ub294')){{ // 은/는
+    document.getElementById('register').classList.add('masculine');
+}}
+else if (word.includes('\uc744') || word.includes('\ub97c')){{ // 을/를
+    document.getElementById('register').classList.add('feminine');
+}}
+'''
+        else:
+            # Default: No specific logic
+            return '// No language-specific logic'
 
     def _run_with_timeout(self, func, timeout, *args, **kwargs):
         """Run a blocking function in a thread and enforce a timeout."""
