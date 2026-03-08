@@ -87,34 +87,30 @@ if (document.readyState === 'loading') {{
 }}
 </script>"""
     
-    # Card 1 back template (existing)
+    # Card 1 back template
     back_template_card1 = """{{FrontSide}}
-
-<hr id="answer">
-
-<div class="TitleBar title-r">Answer</div>
-
-<div class="Text_Card radius">
-<div class="Text-answer">{{Explanation}}</div>
-{{#Synonyme}}<div class="Synonyme">≈ {{Synonyme}}</div>{{/Synonyme}}
-{{#Conjugaison/Gender}}<div class="Verbform">{{Conjugaison/Gender}}</div>{{/Conjugaison/Gender}}
+<div class="noreplaybutton"> [sound:silence1.mp3] </div>
+<div class="Text_Card radius"><hr id=answer>
+<div class="Text-answer">
+{{Explanation}}
+</div>
+{{Synonyme}}
 </div>
 
 {{#exemple-""" + target_lang.code.upper() + """}}
 <ul class="light-r2">
-<li class="eB">{{exemple-""" + target_lang.code.upper() + """}}</li>
-<li class="eg">{{exemple-Explanation}}</li>
-{{#exemple1-Audio}}{{exemple1-Audio}}{{/exemple1-Audio}}
-</ul>
+					<li class="eB">{{exemple-""" + target_lang.code.upper() + """}}{{exemple1-Audio}}
+{{/exemple-""" + target_lang.code.upper() + """}}
+{{#exemple-""" + target_lang.code.upper() + """}}
+					<li class="eg">{{exemple-Explanation}}
 {{/exemple-""" + target_lang.code.upper() + """}}
 
 {{#exemple2-""" + target_lang.code.upper() + """}}
-<ul class="light-r2">
-<li class="eB">{{exemple2-""" + target_lang.code.upper() + """}}</li>
-<li class="eg">{{exemple2-Explanation}}</li>
-{{#exemple2-Audio}}{{exemple2-Audio}}{{/exemple2-Audio}}
+					<li class="eB">{{exemple2-""" + target_lang.code.upper() + """}}{{exemple2-Audio}}
+{{/exemple2-""" + target_lang.code.upper() + """}}{{#exemple2-Explanation}}
+					<li class="eg">{{exemple2-Explanation}}
+{{/exemple2-Explanation}}
 </ul>
-{{/exemple2-""" + target_lang.code.upper() + """}}
 
 {{#Extend}}
 <div class="extend">
@@ -197,35 +193,30 @@ if (document.readyState === 'loading') {{
 }}
 </script>"""
     
-    # Card 2 back template - show answer with all details
+    # Card 2 back template - aligned with Card 1 format
     back_template_card2 = f"""{{{{FrontSide}}}}
 <div class="noreplaybutton"> [sound:silence1.mp3] </div>
-
-<hr id="answer">
-
-<div class="TitleBar title-r">Answer</div>
-
-<div class="Text_Card radius">
-<div class="Text-answer">{{{{Explanation}}}}</div>
-{{{{#Synonyme}}}}<div class="Synonyme">≈ {{{{Synonyme}}}}</div>{{{{/Synonyme}}}}
-{{{{#Conjugaison/Gender}}}}<div class="Verbform">{{{{Conjugaison/Gender}}}}</div>{{{{/Conjugaison/Gender}}}}
+<div class="Text_Card radius"><hr id=answer>
+<div class="Text-answer">
+{{{{Explanation}}}}
+</div>
+{{{{Synonyme}}}}
 </div>
 
 {{{{#exemple-{target_lang.code.upper()}}}}}
 <ul class="light-r2">
-<li class="eB">{{{{exemple-{target_lang.code.upper()}}}}}</li>
-<li class="eg">{{{{exemple-Explanation}}}}</li>
-{{{{#exemple1-Audio}}}}{{{{exemple1-Audio}}}}{{{{/exemple1-Audio}}}}
-</ul>
+					<li class="eB">{{{{exemple-{target_lang.code.upper()}}}}}{{{{exemple1-Audio}}}}
+{{{{/exemple-{target_lang.code.upper()}}}}}
+{{{{#exemple-{target_lang.code.upper()}}}}}
+					<li class="eg">{{{{exemple-Explanation}}}}
 {{{{/exemple-{target_lang.code.upper()}}}}}
 
 {{{{#exemple2-{target_lang.code.upper()}}}}}
-<ul class="light-r2">
-<li class="eB">{{{{exemple2-{target_lang.code.upper()}}}}}</li>
-<li class="eg">{{{{exemple2-Explanation}}}}</li>
-{{{{#exemple2-Audio}}}}{{{{exemple2-Audio}}}}{{{{/exemple2-Audio}}}}
+					<li class="eB">{{{{exemple2-{target_lang.code.upper()}}}}}{{{{exemple2-Audio}}}}
+{{{{/exemple2-{target_lang.code.upper()}}}}}{{{{#exemple2-Explanation}}}}
+					<li class="eg">{{{{exemple2-Explanation}}}}
+{{{{/exemple2-Explanation}}}}
 </ul>
-{{{{/exemple2-{target_lang.code.upper()}}}}}
 
 {{{{#Extend}}}}
 <div class="extend">

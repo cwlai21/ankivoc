@@ -205,35 +205,30 @@ Reading & Spelling
 {self._get_language_specific_script(self.target_lang.code, native_name)}
 </script>"""
         
-        # Card 2 back: Show the front side with full answer
+        # Card 2 back: Show the front side with full answer - aligned with Card 1 format
         back_template_card2 = f"""{{{{FrontSide}}}}
 <div class="noreplaybutton"> [sound:silence1.mp3] </div>
-
-<hr id="answer">
-
-<div class="TitleBar title-r">Answer</div>
-
-<div class="Text_Card radius">
-<div class="Text-answer">{{{{Explanation}}}}</div>
-{{{{#Synonyme}}}}<div class="Synonyme">≈ {{{{Synonyme}}}}</div>{{{{/Synonyme}}}}
-{{{{#Conjugaison/Gender}}}}<div class="Verbform">{{{{Conjugaison/Gender}}}}</div>{{{{/Conjugaison/Gender}}}}
+<div class="Text_Card radius"><hr id=answer>
+<div class="Text-answer">
+{{{{Explanation}}}}
+</div>
+{{{{Synonyme}}}}
 </div>
 
 {{{{#exemple-{self.target_lang.code.upper()}}}}}
 <ul class="light-r2">
-<li class="eB">{{{{exemple-{self.target_lang.code.upper()}}}}}</li>
-<li class="eg">{{{{exemple-Explanation}}}}</li>
-{{{{#exemple1-Audio}}}}{{{{exemple1-Audio}}}}{{{{/exemple1-Audio}}}}
-</ul>
+					<li class="eB">{{{{exemple-{self.target_lang.code.upper()}}}}}{{{{exemple1-Audio}}}}
+{{{{/exemple-{self.target_lang.code.upper()}}}}}
+{{{{#exemple-{self.target_lang.code.upper()}}}}}
+					<li class="eg">{{{{exemple-Explanation}}}}
 {{{{/exemple-{self.target_lang.code.upper()}}}}}
 
 {{{{#exemple2-{self.target_lang.code.upper()}}}}}
-<ul class="light-r2">
-<li class="eB">{{{{exemple2-{self.target_lang.code.upper()}}}}}</li>
-<li class="eg">{{{{exemple2-Explanation}}}}</li>
-{{{{#exemple2-Audio}}}}{{{{exemple2-Audio}}}}{{{{/exemple2-Audio}}}}
+					<li class="eB">{{{{exemple2-{self.target_lang.code.upper()}}}}}{{{{exemple2-Audio}}}}
+{{{{/exemple2-{self.target_lang.code.upper()}}}}}{{{{#exemple2-Explanation}}}}
+					<li class="eg">{{{{exemple2-Explanation}}}}
+{{{{/exemple2-Explanation}}}}
 </ul>
-{{{{/exemple2-{self.target_lang.code.upper()}}}}}
 
 {{{{#Extend}}}}
 <div class="extend">
