@@ -36,6 +36,10 @@ class BatchCreateView(APIView):
             # If target is English, force explanation to Chinese
             from languages.models import Language
             explanation_language = Language.objects.get(code='zh')
+        elif data['target_language'].code == 'ja':
+            # If target is Japanese, force explanation to Traditional Chinese
+            from languages.models import Language
+            explanation_language = Language.objects.get(code='zh')
         elif explanation_language.code not in ['en', 'fr', 'zh']:
             # Otherwise, default to English if not one of the allowed
             from languages.models import Language
