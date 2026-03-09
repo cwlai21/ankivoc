@@ -2,13 +2,14 @@ from django.urls import path
 from django.contrib.auth import views as auth_views
 from django.views.generic import TemplateView
 from django.contrib.auth.decorators import login_required
+from . import views
 
 app_name = 'accounts-web'
 
 urlpatterns = [
     path(
         'login/',
-        auth_views.LoginView.as_view(template_name='accounts/login.html'),
+        views.WebLoginView.as_view(),
         name='login',
     ),
     path(
@@ -18,7 +19,7 @@ urlpatterns = [
     ),
     path(
         'register/',
-        TemplateView.as_view(template_name='accounts/register.html'),
+        views.RegisterView.as_view(),
         name='register',
     ),
     path(

@@ -120,7 +120,9 @@ class VocabularyBatchCreateSerializer(serializers.Serializer):
         help_text='Language code, e.g. fr'
     )
     explanation_language = serializers.CharField(
-        help_text='Language code, e.g. en'
+        required=False,
+        allow_blank=True,
+        help_text='Language code, e.g. en (optional, defaults to user preference)'
     )
     vocabulary = serializers.ListField(
         child=serializers.CharField(max_length=500),
@@ -146,6 +148,8 @@ class VocabularyBatchCreateSerializer(serializers.Serializer):
 
     def validate_explanation_language(self, value):
         from languages.models import Language
+        if not value:  # Allow empty value, will be set to user default
+            return None
         try:
             return Language.objects.get(code=value, is_active=True)
         except Language.DoesNotExist:
@@ -161,7 +165,8 @@ class VocabularyBatchCreateSerializer(serializers.Serializer):
         return cleaned
 
     def validate(self, data):
-        if data['target_language'] == data['explanation_language']:
+        # Only validate if explanation_language is provided
+        if data.get('explanation_language') and data['target_language'] == data['explanation_language']:
             raise serializers.ValidationError(
                 'Target language and explanation language must be different.'
             )

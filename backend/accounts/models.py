@@ -65,6 +65,22 @@ class User(AbstractUser):
 		help_text='Default Anki deck name, e.g. French::Vocabulary'
 	)
 
+	# ── Anki Setup Status ──
+	anki_setup_completed = models.BooleanField(
+		default=False,
+		help_text='Whether user has completed Anki desktop + AnkiConnect setup'
+	)
+	anki_last_checked = models.DateTimeField(
+		null=True,
+		blank=True,
+		help_text='Last time Anki connection was verified'
+	)
+	ankiconnect_version = models.IntegerField(
+		null=True,
+		blank=True,
+		help_text='Detected AnkiConnect version number'
+	)
+
 	class Meta:
 		db_table = 'users'
 		verbose_name = 'User'

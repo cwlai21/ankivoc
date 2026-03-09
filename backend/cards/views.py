@@ -28,22 +28,37 @@ class BatchCreateView(APIView):
         serializer.is_valid(raise_exception=True)
 
         data = serializer.validated_data
+        from languages.models import Language
 
-        # Create the batch
-        # Explanation language logic
-        explanation_language = data['explanation_language']
-        if data['target_language'].code == 'en':
-            # If target is English, force explanation to Chinese
-            from languages.models import Language
-            explanation_language = Language.objects.get(code='zh')
-        elif data['target_language'].code == 'ja':
-            # If target is Japanese, force explanation to Traditional Chinese
-            from languages.models import Language
-            explanation_language = Language.objects.get(code='zh')
-        elif explanation_language.code not in ['en', 'fr', 'zh']:
-            # Otherwise, default to English if not one of the allowed
-            from languages.models import Language
+        # Determine explanation language
+        explanation_language = data.get('explanation_language')
+        
+        # If no explanation language provided, use user's default
+        if not explanation_language:
+            explanation_language = request.user.default_explanation_language
+        
+        # If still no explanation language (user hasn't set default), fall back to English
+        if not explanation_language:
             explanation_language = Language.objects.get(code='en')
+        
+        # If target language matches explanation language, choose an alternative
+        if data['target_language'] == explanation_language:
+            # Try to find an alternative from user's available languages
+            # Priority: English > Traditional Chinese > French
+            for fallback_code in ['en', 'zh', 'fr']:
+                if data['target_language'].code != fallback_code:
+                    try:
+                        explanation_language = Language.objects.get(code=fallback_code, is_active=True)
+                        break
+                    except Language.DoesNotExist:
+                        continue
+            
+            # If still same (shouldn't happen with above logic), raise error
+            if data['target_language'] == explanation_language:
+                return Response({
+                    'error': 'Cannot determine explanation language',
+                    'message': 'Target language matches your preferred explanation language. Please specify a different explanation language.'
+                }, status=status.HTTP_400_BAD_REQUEST)
 
         batch = VocabularyBatch.objects.create(
             user=request.user,

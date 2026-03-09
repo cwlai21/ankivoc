@@ -8,9 +8,142 @@
     <div class="card mt-5">
       <div class="card-body">
         <h3 class="card-title mb-4">Register</h3>
-        <p class="text-muted">Registration is disabled in this demo.</p>
+        
+        <div id="anki-status-alert" class="alert alert-warning d-none" role="alert">
+          <strong>⚠️ Anki Setup Required</strong>
+          <p class="mb-0 mt-2">Please ensure Anki Desktop is running with AnkiConnect add-on installed.</p>
+        </div>
+
+        <form method="post" id="registerForm">
+          {% csrf_token %}
+          
+          <div class="mb-3">
+            <label for="username" class="form-label">Username</label>
+            <input 
+              type="text" 
+              class="form-control {% if form.username.errors %}is-invalid{% endif %}" 
+              id="username" 
+              name="username" 
+              value="{{ form.username.value|default:'' }}"
+              required>
+            {% if form.username.errors %}
+              <div class="invalid-feedback">
+                {{ form.username.errors|first }}
+              </div>
+            {% endif %}
+          </div>
+
+          <div class="mb-3">
+            <label for="email" class="form-label">Email</label>
+            <input 
+              type="email" 
+              class="form-control {% if form.email.errors %}is-invalid{% endif %}" 
+              id="email" 
+              name="email" 
+              value="{{ form.email.value|default:'' }}"
+              required>
+            {% if form.email.errors %}
+              <div class="invalid-feedback">
+                {{ form.email.errors|first }}
+              </div>
+            {% endif %}
+          </div>
+
+          <div class="mb-3">
+            <label for="password" class="form-label">Password</label>
+            <input 
+              type="password" 
+              class="form-control {% if form.password.errors %}is-invalid{% endif %}" 
+              id="password" 
+              name="password"
+              required>
+            {% if form.password.errors %}
+              <div class="invalid-feedback">
+                {{ form.password.errors|first }}
+              </div>
+            {% endif %}
+          </div>
+
+          <div class="mb-3">
+            <label for="password_confirm" class="form-label">Confirm Password</label>
+            <input 
+              type="password" 
+              class="form-control {% if form.password_confirm.errors %}is-invalid{% endif %}" 
+              id="password_confirm" 
+              name="password_confirm"
+              required>
+            {% if form.password_confirm.errors %}
+              <div class="invalid-feedback">
+                {{ form.password_confirm.errors|first }}
+              </div>
+            {% endif %}
+          </div>
+
+          <div class="mb-3">
+            <label for="language_preference" class="form-label">Language Preference</label>
+            <select 
+              class="form-select {% if form.language_preference.errors %}is-invalid{% endif %}" 
+              id="language_preference" 
+              name="language_preference">
+              <option value="">Select a language...</option>
+              {% for lang in languages %}
+                <option value="{{ lang.id }}" {% if form.language_preference.value == lang.id|stringformat:"s" %}selected{% endif %}>
+                  {{ lang.name }}
+                </option>
+              {% endfor %}
+            </select>
+            {% if form.language_preference.errors %}
+              <div class="invalid-feedback">
+                {{ form.language_preference.errors|first }}
+              </div>
+            {% endif %}
+          </div>
+
+          <div class="d-grid gap-2">
+            <button type="submit" class="btn btn-primary">Register</button>
+          </div>
+
+          <div class="mt-3 text-center">
+            <p class="text-muted">Already have an account? <a href="{% url 'accounts-web:login' %}">Login here</a></p>
+          </div>
+        </form>
       </div>
     </div>
   </div>
 </div>
+
+<script>
+  // Check Anki status on page load
+  document.addEventListener('DOMContentLoaded', function() {
+    checkAnkiStatus();
+  });
+
+  async function checkAnkiStatus() {
+    try {
+      const response = await fetch('http://localhost:8765', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'version', version: 6 })
+      });
+      
+      if (!response.ok) {
+        showAnkiWarning();
+      } else {
+        const data = await response.json();
+        if (!data.result) {
+          showAnkiWarning();
+        }
+      }
+    } catch (error) {
+      showAnkiWarning();
+    }
+  }
+
+  function showAnkiWarning() {
+    const alert = document.getElementById('anki-status-alert');
+    if (alert) {
+      alert.classList.remove('d-none');
+    }
+  }
+</script>
 {% endblock %}

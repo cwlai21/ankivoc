@@ -307,27 +307,30 @@ async function loadLanguages() {
 
         // Set defaults from user preferences
         var defaultTarget = '{{ user.default_target_language.code|default:"" }}';
-        var defaultExplanation = '{{ user.default_explanation_language.code|default:"" }}';
+        var defaultExplanation = '{{ user.default_explanation_language.code|default:"en" }}';
 
         if (defaultTarget) {
             targetSelect.value = defaultTarget;
             selectedTargetCode = defaultTarget;
             checkTemplate(defaultTarget);
-            
-            // 自動設定預設解釋語言
-            if (defaultTarget === 'en') {
-                // 目標語言是英語時，預設解釋語言為中文
-                explanationSelect.value = 'zh';
-                selectedExplanationCode = 'zh';
-            } else {
-                // 其他目標語言時，預設解釋語言為英語
-                explanationSelect.value = 'en';
-                selectedExplanationCode = 'en';
-            }
-        } else if (defaultExplanation) {
-            // 只有在沒有預設目標語言時才使用預設解釋語言
+        }
+        
+        // Auto-select explanation language based on user preference
+        if (defaultExplanation && defaultTarget !== defaultExplanation) {
+            // Use user's preferred explanation language if different from target
             explanationSelect.value = defaultExplanation;
             selectedExplanationCode = defaultExplanation;
+        } else if (defaultTarget === defaultExplanation || !defaultExplanation) {
+            // Target matches preference or no preference set - choose alternative
+            // Priority: en > zh > fr
+            var alternatives = ['en', 'zh', 'fr'];
+            for (var i = 0; i < alternatives.length; i++) {
+                if (alternatives[i] !== defaultTarget) {
+                    explanationSelect.value = alternatives[i];
+                    selectedExplanationCode = alternatives[i];
+                    break;
+                }
+            }
         }
 
         validateForm();
@@ -384,14 +387,27 @@ document.getElementById('target-language').addEventListener('change', function()
     selectedTargetCode = this.value;
     checkTemplate(this.value);
     
-    // 自動設定預設解釋語言
+    // Auto-adjust explanation language based on user preference
+    var defaultExplanation = '{{ user.default_explanation_language.code|default:"en" }}';
     var explanationSelect = document.getElementById('explanation-language');
-    if (this.value === 'en') {
-        // 目標語言是英語時，預設解釋語言為中文
-        explanationSelect.value = 'zh';
-    } else if (this.value) {
-        // 其他目標語言時，預設解釋語言為英語
-        explanationSelect.value = 'en';
+    var currentExplanation = explanationSelect.value;
+    
+    // If current selection matches new target, switch to user's preferred explanation language
+    // or find an alternative if preferred also matches target
+    if (this.value === currentExplanation) {
+        if (this.value !== defaultExplanation) {
+            // Use user's preference if it differs from target
+            explanationSelect.value = defaultExplanation;
+        } else {
+            // Find alternative: en > zh > fr
+            var alternatives = ['en', 'zh', 'fr'];
+            for (var i = 0; i < alternatives.length; i++) {
+                if (alternatives[i] !== this.value) {
+                    explanationSelect.value = alternatives[i];
+                    break;
+                }
+            }
+        }
     }
     selectedExplanationCode = explanationSelect.value;
     

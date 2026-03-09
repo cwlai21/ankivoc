@@ -8,6 +8,7 @@
     <div class="card mt-5">
       <div class="card-body">
         <h3 class="card-title mb-4">Login</h3>
+        
         <form method="post" action="{% url 'accounts-web:login' %}">
           {% csrf_token %}
           <div class="mb-3">

@@ -86,8 +86,12 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'default_explanation_language_name',
             'default_deck_name',
             'date_joined',
+            'anki_setup_completed',
+            'anki_last_checked',
+            'ankiconnect_version',
         ]
-        read_only_fields = ['id', 'username', 'date_joined']
+        read_only_fields = ['id', 'username', 'date_joined', 'anki_setup_completed', 
+                           'anki_last_checked', 'ankiconnect_version']
  
     def get_default_target_language_name(self, obj):
         if obj.default_target_language:

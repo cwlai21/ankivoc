@@ -86,6 +86,66 @@ class AnkiConnectClient:
         """
         return self._invoke('version')
 
+    def check_anki_status(self):
+        """
+        Check if Anki desktop is running and AnkiConnect is available.
+
+        Returns:
+            dict: {
+                'anki_running': bool,
+                'ankiconnect_installed': bool,
+                'version': int or None,
+                'message': str
+            }
+        """
+        try:
+            version = self._invoke('version')
+            return {
+                'anki_running': True,
+                'ankiconnect_installed': True,
+                'version': version,
+                'message': f'AnkiConnect v{version} is ready'
+            }
+        except AnkiConnectError as e:
+            error_msg = str(e).lower()
+            if 'cannot connect' in error_msg or 'connection' in error_msg:
+                return {
+                    'anki_running': False,
+                    'ankiconnect_installed': None,  # Cannot determine if Anki is not running
+                    'version': None,
+                    'message': 'Cannot connect to AnkiConnect. Please ensure: (1) Anki is running, (2) AnkiConnect add-on is installed and enabled (Tools → Add-ons).'
+                }
+            else:
+                return {
+                    'anki_running': True,
+                    'ankiconnect_installed': False,
+                    'version': None,
+                    'message': 'AnkiConnect add-on may not be installed. Please install AnkiConnect.'
+                }
+        except Exception as e:
+            return {
+                'anki_running': False,
+                'ankiconnect_installed': None,
+                'version': None,
+                'message': f'Unexpected error checking Anki status: {str(e)}'
+            }
+
+    def get_addons_list(self):
+        """
+        Get list of installed Anki add-ons.
+        
+        Note: This uses the getAddons action which may not be available in all 
+        AnkiConnect versions.
+        
+        Returns:
+            list: List of add-on IDs or empty list if not supported
+        """
+        try:
+            return self._invoke('getAddons')
+        except AnkiConnectError:
+            logger.warning('getAddons action not supported by this AnkiConnect version')
+            return []
+
     def get_deck_names(self):
         """Get all deck names."""
         return self._invoke('deckNames')

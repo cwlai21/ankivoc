@@ -9,5 +9,7 @@ urlpatterns = [
     path('logout/', views.LogoutView.as_view(), name='logout'),
     path('profile/', views.ProfileView.as_view(), name='profile'),
     path('change-password/', views.ChangePasswordView.as_view(), name='change-password'),
+    path('check-anki/', views.CheckAnkiStatusView.as_view(), name='check-anki'),
+    path('download-ankiconnect/', views.DownloadAnkiConnectView.as_view(), name='download-ankiconnect'),
 ]
 
