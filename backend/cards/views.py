@@ -99,6 +99,10 @@ class BatchCreateView(APIView):
             return Response(result_serializer.data, status=status.HTTP_201_CREATED)
         elif batch.status == VocabularyBatch.Status.PARTIAL_FAILURE:
             return Response(result_serializer.data, status=status.HTTP_207_MULTI_STATUS)
+        elif batch.status == VocabularyBatch.Status.FAILED:
+            # Card-level failures (duplicates, Anki errors, etc.) — return batch
+            # detail so the frontend can display per-card error messages.
+            return Response(result_serializer.data, status=status.HTTP_207_MULTI_STATUS)
         else:
             error_payload = {
                 'error': 'Pipeline failed',

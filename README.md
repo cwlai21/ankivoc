@@ -1,7 +1,7 @@
 LangChain AI helpers and experiments
 ===================================
 
-A small workspace for generating Anki vocab notes using LLMs and Azure TTS.
+A small workspace for generating Anki vocabulary notes using LLMs and Azure TTS.
 
 ## Notes about backend placeholders
 

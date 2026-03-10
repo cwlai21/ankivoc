@@ -8,9 +8,68 @@
 
     <div class="col-md-8">
 
+        <!-- Desktop Notification Permission Banner (top of page) -->
+        <div id="notif-banner" class="alert alert-info shadow-sm mb-4 d-none" role="alert" style="cursor: pointer; border-left: 5px solid #0d6efd;">
+            <div class="d-flex align-items-center justify-content-between" onclick="requestNotifPermission()">
+                <div>
+                    <i class="bi bi-bell-fill" style="font-size: 1.4rem;"></i>
+                    <strong>Enable Desktop Notifications</strong>
+                    <br><small class="text-muted">Get notified when batch completes, even when you're in another app.</small>
+                </div>
+                <button class="btn btn-primary btn-sm" type="button">
+                    <i class="bi bi-bell"></i> Enable
+                </button>
+            </div>
+        </div>
+        <div id="notif-granted" class="alert alert-success shadow-sm mb-4 d-none" role="alert" style="border-left: 5px solid #198754;">
+            <i class="bi bi-bell-fill"></i> <strong>Desktop notifications enabled!</strong>
+            <small class="text-muted">You'll be notified when batches complete.</small>
+        </div>
 
         <h2 class="mb-4"><i class="bi bi-plus-circle"></i> Add Vocabulary</h2>
 
+        <div id="batch-creation-form">
+        <!-- Anki Connection Status Warning - Visual Guide -->
+        <div id="anki-status-warning" class="alert alert-primary border-primary d-none shadow-lg mb-4" role="alert" style="animation: pulse 2s infinite; background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); border-color: #1e3c72 !important;">
+          <div class="text-center mb-3">
+            <h5 class="alert-heading mb-2">
+              <i class="bi bi-exclamation-triangle-fill" style="font-size: 1.8rem;"></i>
+              <strong>Anki Not Connected!</strong>
+            </h5>
+            <p class="mb-0">Cannot sync cards without Anki Desktop running</p>
+          </div>
+          
+          <!-- Compact Visual Flow -->
+          <div class="anki-quick-fix">
+            <div class="fix-step">
+              <div class="fix-number">1</div>
+              <div class="fix-icon"><i class="bi bi-laptop"></i></div>
+              <div class="fix-label">Open Anki</div>
+            </div>
+            
+            <div class="fix-arrow"><i class="bi bi-chevron-right"></i></div>
+            
+            <div class="fix-step">
+              <div class="fix-number">2</div>
+              <div class="fix-icon"><i class="bi bi-puzzle"></i></div>
+              <div class="fix-label">AnkiConnect<br><small>2055492159</small></div>
+            </div>
+            
+            <div class="fix-arrow"><i class="bi bi-chevron-right"></i></div>
+            
+            <div class="fix-step">
+              <div class="fix-number">3</div>
+              <div class="fix-icon"><i class="bi bi-check-circle"></i></div>
+              <div class="fix-label">Check Below</div>
+            </div>
+          </div>
+          
+          <div class="text-center mt-3">
+            <button type="button" class="btn btn-warning" onclick="checkAnkiConnection()">
+              <i class="bi bi-arrow-clockwise"></i> Check Connection Now
+            </button>
+          </div>
+        </div>
 
         <!-- ── Status Messages ── -->
 
@@ -97,6 +156,7 @@ magnifique"
                     <button type="button"
                             class="btn btn-success btn-lg"
                             id="submit-batch-btn"
+                            onclick="submitBatch()"
                             disabled>
                         <i class="bi bi-send"></i> Generate Cards
                     </button>
@@ -104,6 +164,8 @@ magnifique"
             </div>
         </div>
 
+
+        </div><!-- /batch-creation-form -->
 
         <!-- ═══════════════════════════════════════════ -->
         <!-- Processing Progress                         -->
@@ -122,10 +184,9 @@ magnifique"
                          class="progress-bar progress-bar-striped progress-bar-animated"
                          role="progressbar"
                          style="width: 0%">
-                        0%
                     </div>
                 </div>
-                <p id="processing-status" class="text-center text-muted mb-0">
+                <p id="progress-text" class="text-center text-muted mb-0">
                     Preparing...
                 </p>
             </div>
@@ -180,6 +241,25 @@ magnifique"
     </div>
 </div>
 
+<!-- Modal for Batch Completion -->
+<div class="modal fade" id="batchCompleteModal" tabindex="-1" aria-labelledby="batchCompleteModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header" id="modal-header">
+        <h5 class="modal-title" id="batchCompleteModalLabel">Batch Processing Complete</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="modal-body">
+        ...
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <a href="#" id="view-batch-btn" class="btn btn-primary">View Batch</a>
+      </div>
+    </div>
+  </div>
+</div>
+
 {% endblock %}
 
 {% block extra_js %}
@@ -196,6 +276,54 @@ var currentBatchId = null;
 // ═══════════════════════════════════════════════════════════════════
 // Utility Functions
 // ═══════════════════════════════════════════════════════════════════
+
+// Check Anki Connection
+async function checkAnkiConnection() {
+    const warningDiv = document.getElementById('anki-status-warning');
+    
+    try {
+        const response = await fetch('http://localhost:8765', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'version', version: 6 })
+        });
+        
+        if (!response.ok) {
+            showAnkiWarning();
+        } else {
+            const data = await response.json();
+            if (!data.result) {
+                showAnkiWarning();
+            } else {
+                // Connection successful
+                if (warningDiv) {
+                    warningDiv.classList.add('d-none');
+                }
+                showBatchMessage('success', '<i class="bi bi-check-circle"></i> Anki connected successfully!');
+                // Auto-dismiss after 5 seconds
+                setTimeout(function() {
+                    var msg = document.getElementById('batch-message');
+                    if (msg && !msg.classList.contains('d-none')) {
+                        msg.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+                        msg.style.opacity = '0';
+                        msg.style.transform = 'translateY(-10px)';
+                        setTimeout(function() { msg.classList.add('d-none'); msg.style.opacity = ''; msg.style.transform = ''; }, 500);
+                    }
+                }, 2000);
+            }
+        }
+    } catch (error) {
+        showAnkiWarning();
+    }
+}
+
+function showAnkiWarning() {
+    const warningDiv = document.getElementById('anki-status-warning');
+    if (warningDiv) {
+        warningDiv.classList.remove('d-none');
+        warningDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+}
 
 function getCookie(name) {
     var value = null;
@@ -423,387 +551,288 @@ document.getElementById('explanation-language').addEventListener('change', funct
 // Submit Batch
 // ═══════════════════════════════════════════════════════════════════
 
-document.getElementById('submit-batch-btn').addEventListener('click', async function() {
-    var btn = this;
-    var originalHTML = '<i class="bi bi-send"></i> Generate Cards';
+// Show notification permission banner based on current state
+var _swRegistration = null;
+
+(function initNotifBanner() {
+    if (!('Notification' in window)) return;
+    // Register service worker for reliable notifications
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw-notif.js').then(function(reg) {
+            _swRegistration = reg;
+            console.log('[Notif] Service worker registered');
+        }).catch(function(err) {
+            console.warn('[Notif] SW registration failed:', err);
+        });
+    }
+    var banner = document.getElementById('notif-banner');
+    var granted = document.getElementById('notif-granted');
+    if (Notification.permission === 'default') {
+        banner.classList.remove('d-none');
+    } else if (Notification.permission === 'granted') {
+        granted.classList.remove('d-none');
+        setTimeout(function() {
+            granted.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+            granted.style.opacity = '0';
+            granted.style.transform = 'translateY(-10px)';
+            setTimeout(function() { granted.classList.add('d-none'); granted.style.opacity = ''; granted.style.transform = ''; }, 500);
+        }, 2000);
+    }
+})();
+
+function requestNotifPermission() {
+    if (!('Notification' in window)) return;
+    Notification.requestPermission().then(function(perm) {
+        var banner = document.getElementById('notif-banner');
+        var granted = document.getElementById('notif-granted');
+        banner.classList.add('d-none');
+        if (perm === 'granted') {
+            granted.classList.remove('d-none');
+            // Send a test notification via service worker
+            console.log('[Notif] Permission granted, sending test notification...');
+            sendDesktopNotification('Notifications Enabled', 'You will now receive alerts when batch processing completes.');
+        } else {
+            console.log('[Notif] Permission result:', perm);
+        }
+    });
+}
+
+function sendDesktopNotification(title, body) {
+    console.log('[Notif] sendDesktopNotification called:', title, body);
+    if (!('Notification' in window) || Notification.permission !== 'granted') {
+        console.log('[Notif] Skipping — not granted');
+        return;
+    }
+    // Prefer service worker showNotification (reliable on macOS Chrome)
+    if (_swRegistration) {
+        _swRegistration.showNotification(title, {
+            body: body,
+            tag: 'batch-' + Date.now(),
+            requireInteraction: true,
+            icon: '/static/img/favicon.png',
+        }).then(function() {
+            console.log('[Notif] SW notification shown');
+        }).catch(function(err) {
+            console.warn('[Notif] SW notification failed, falling back:', err);
+            _fallbackNotification(title, body);
+        });
+    } else {
+        // Fallback: try constructor directly
+        _fallbackNotification(title, body);
+    }
+}
+
+function _fallbackNotification(title, body) {
+    try {
+        var n = new Notification(title, {
+            body: body,
+            tag: 'batch-' + Date.now(),
+            requireInteraction: true,
+        });
+        n.onclick = function() { window.focus(); n.close(); };
+        console.log('[Notif] Fallback notification created');
+    } catch (e) {
+        console.error('[Notif] Fallback notification failed:', e);
+    }
+}
+
+async function submitBatch() {
+    var btn = document.getElementById('submit-batch-btn');
+    var originalHTML = btn.innerHTML;
+    setButtonLoading(btn, true, originalHTML);
+
     var words = getWordList();
     var targetLang = document.getElementById('target-language').value;
     var explanationLang = document.getElementById('explanation-language').value;
 
-    // Validation
-    if (words.length === 0) {
-        showBatchMessage('danger', 'Please enter at least one vocabulary word.');
-        return;
-    }
-    if (words.length > 50) {
-        showBatchMessage('danger', 'Maximum 50 words per batch.');
-        return;
-    }
-    if (!targetLang || !explanationLang) {
-        showBatchMessage('danger', 'Please select both languages.');
-        return;
-    }
-    if (targetLang === explanationLang) {
-        showBatchMessage('danger', 'Target and explanation language must be different.');
-        return;
-    }
-
-    // Show processing section
-    setButtonLoading(btn, true);
-    document.getElementById('batch-message').classList.add('d-none');
-    document.getElementById('results-section').classList.add('d-none');
-
-    var processingSection = document.getElementById('processing-section');
-    var progressBar = document.getElementById('progress-bar');
-    var processingStatus = document.getElementById('processing-status');
-
-    processingSection.classList.remove('d-none');
-    progressBar.style.width = '10%';
-    progressBar.textContent = '10%';
-    processingStatus.textContent = 'Submitting batch...';
-
     try {
-        // Update progress — submitting
-        progressBar.style.width = '20%';
-        progressBar.textContent = '20%';
-        processingStatus.textContent = 'Translating vocabulary with AI...';
-
         var response = await fetch('/api/v1/cards/batches/', {
             method: 'POST',
             credentials: 'same-origin',
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRFToken': getCookie('csrftoken'),
-                'Accept': 'application/json',
             },
             body: JSON.stringify({
+                vocabulary: words,
                 target_language: targetLang,
                 explanation_language: explanationLang,
-                vocabulary: words,
             }),
         });
 
-        // Update progress — response received
-        progressBar.style.width = '90%';
-        progressBar.textContent = '90%';
-        processingStatus.textContent = 'Processing results...';
+        var data = await response.json();
 
-        var data;
-        try {
-            var ct = response.headers.get('Content-Type') || '';
-            if (ct.indexOf('application/json') !== -1) {
-                data = await response.json();
-            } else {
-                var text = await response.text();
-                throw new Error('Server returned non-JSON response: ' + text);
-            }
-        } catch (e) {
-            // Handle parse/network errors gracefully
-            progressBar.style.width = '100%';
-            progressBar.className = 'progress-bar bg-danger';
-            processingStatus.textContent = 'Network error.';
-            showBatchMessage('danger', '<i class="bi bi-x-circle"></i> Network error: ' + e.message);
-            setButtonLoading(btn, false, originalHTML);
-            return;
+        if (response.status === 500) {
+            // True server error
+            var errorMsg = (data && data.message) ? data.message : 'An unknown server error occurred.';
+            throw new Error(errorMsg);
         }
 
-        // Complete progress
-        progressBar.style.width = '100%';
-        progressBar.textContent = '100%';
-        progressBar.classList.remove('progress-bar-animated');
+        // 201 = all succeeded, 207 = partial or all failed (but batch was processed)
+        currentBatchId = data.id;
 
-        if (response.ok || response.status === 207) {
-            currentBatchId = data.id;
-            displayResults(data);
+        // Show completion results directly (batch is already done — synchronous pipeline)
+        showCompletionModal(data);
+        setButtonLoading(btn, false, originalHTML);
 
-            if (data.status === 'completed') {
-                processingStatus.textContent = 'All cards generated successfully!';
-                progressBar.className = 'progress-bar bg-success';
-                showBatchMessage('success',
-                    '<i class="bi bi-check-circle"></i> All ' +
-                    data.summary.total + ' cards pushed to Anki successfully!');
-            } else if (data.status === 'partial_failure') {
-                processingStatus.textContent = 'Some cards failed.';
-                progressBar.className = 'progress-bar bg-warning';
-                showBatchMessage('warning',
-                    '<i class="bi bi-exclamation-triangle"></i> ' +
-                    data.summary.pushed + ' of ' + data.summary.total +
-                    ' cards pushed. ' + data.summary.failed + ' failed.');
-            } else {
-                processingStatus.textContent = 'Batch failed.';
-                progressBar.className = 'progress-bar bg-danger';
-                showBatchMessage('danger',
-                    '<i class="bi bi-x-circle"></i> Batch processing failed.');
-            }
-
+        // Send OS-level desktop notification so user sees it even in other apps
+        if (data.status === 'completed') {
+            sendDesktopNotification(
+                '\u2705 Batch Complete',
+                'All ' + data.summary.total + ' cards pushed to Anki successfully!'
+            );
         } else {
-            // Server error
-            processingStatus.textContent = 'Error occurred.';
-            progressBar.className = 'progress-bar bg-danger';
-
-            var errorMsg = 'Server error. ';
-            if (data.detail) {
-                errorMsg += (typeof data.detail === 'string') ? data.detail : JSON.stringify(data.detail);
-            } else if (data.vocabulary) {
-                errorMsg += formatErrorField(data.vocabulary);
-            } else if (data.target_language) {
-                errorMsg += formatErrorField(data.target_language);
-            } else if (data.non_field_errors) {
-                errorMsg += formatErrorField(data.non_field_errors);
-            } else {
-                errorMsg += JSON.stringify(data);
-            }
-            showBatchMessage('danger', '<i class="bi bi-x-circle"></i> ' + errorMsg);
+            sendDesktopNotification(
+                '\u26A0\uFE0F Batch Finished',
+                data.summary.pushed + '/' + data.summary.total + ' pushed, ' + data.summary.failed + ' failed.'
+            );
         }
 
-    } catch (e) {
-        progressBar.style.width = '100%';
-        progressBar.className = 'progress-bar bg-danger';
-        processingStatus.textContent = 'Network error.';
-        showBatchMessage('danger', '<i class="bi bi-x-circle"></i> Network error: ' + e.message);
+    } catch (error) {
+        console.error('Batch submission failed:', error);
+        showBatchMessage('danger', '<strong>Error:</strong> ' + escapeHtml(error.message));
+        setButtonLoading(btn, false, originalHTML);
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Update Progress UI
+// ═══════════════════════════════════════════════════════════════════
+
+function updateProgress(batch) {
+    const progressBar = document.getElementById('progress-bar');
+    const progressText = document.getElementById('progress-text');
+
+    if (!batch) {
+        progressBar.style.width = '0%';
+        progressBar.textContent = '';
+        progressText.textContent = 'Preparing...';
+        return;
     }
 
-    setButtonLoading(btn, false, originalHTML);
-});
+    const total = batch.total_cards;
+    const processed = batch.processed_cards;
+    const percentage = total > 0 ? Math.round((processed / total) * 100) : 0;
+
+    progressBar.style.width = percentage + '%';
+    progressBar.textContent = percentage + '%';
+
+    let statusText = `Processing: ${processed} of ${total} cards completed.`;
+    if (batch.status === 'pending') {
+        statusText = 'Batch is queued and will begin processing shortly...';
+    } else if (batch.status === 'processing' && processed === 0) {
+        statusText = 'Processing started. Analyzing words...';
+    }
+
+    progressText.textContent = statusText;
+}
+
 
 // ═══════════════════════════════════════════════════════════════════
 // Display Results
 // ═══════════════════════════════════════════════════════════════════
 
-function displayResults(data) {
-    var resultsSection = document.getElementById('results-section');
-    var resultsHeader = document.getElementById('results-header');
-    var resultsTitle = document.getElementById('results-title');
-    var resultsSummary = document.getElementById('results-summary');
-    var resultsBody = document.getElementById('results-body');
-    var retrySection = document.getElementById('retry-section');
-    var newBatchBtn = document.getElementById('new-batch-btn');
+function displayResults(batch) {
+    // Hide processing, show results
+    document.getElementById('processing-section').classList.add('d-none');
+    document.getElementById('results-section').classList.remove('d-none');
+    document.getElementById('results-section').scrollIntoView({ behavior: 'smooth' });
 
-    // Set header color based on status
-    if (data.status === 'completed') {
-        resultsHeader.className = 'card-header bg-success text-white';
-        resultsTitle.innerHTML = '<i class="bi bi-check-circle"></i> Batch Complete';
-    } else if (data.status === 'partial_failure') {
-        resultsHeader.className = 'card-header bg-warning';
-        resultsTitle.innerHTML = '<i class="bi bi-exclamation-triangle"></i> Partial Success';
-    } else {
-        resultsHeader.className = 'card-header bg-danger text-white';
-        resultsTitle.innerHTML = '<i class="bi bi-x-circle"></i> Batch Failed';
+    const resultsTitle = document.getElementById('results-title');
+    const resultsHeader = document.getElementById('results-header');
+    const resultsSummary = document.getElementById('results-summary');
+    const resultsBody = document.getElementById('results-body');
+    const retrySection = document.getElementById('retry-section');
+    const newBatchBtn = document.getElementById('new-batch-btn');
+
+    // Set header color and title based on status
+    let headerClass = 'bg-secondary text-white';
+    if (batch.status === 'completed') {
+        headerClass = 'bg-success text-white';
+    } else if (batch.status === 'partial_failure') {
+        headerClass = 'bg-warning text-dark';
+    } else if (batch.status === 'failed') {
+        headerClass = 'bg-danger text-white';
     }
+    resultsHeader.className = `card-header ${headerClass}`;
+    resultsTitle.textContent = `Batch #${batch.id} - ${batch.status.replace('_', ' ')}`;
 
-    // Summary badges
-    var summary = data.summary || { total: 0, pushed: 0, failed: 0, pending: 0 };
-    resultsSummary.innerHTML =
-        '<span class="badge bg-secondary me-2">Total: ' + summary.total + '</span>' +
-        '<span class="badge bg-success me-2">Pushed: ' + summary.pushed + '</span>' +
-        '<span class="badge bg-danger me-2">Failed: ' + summary.failed + '</span>';
+    // Build summary badges
+    resultsSummary.innerHTML = `
+        <span class="badge bg-success me-1">${batch.succeeded_cards} Succeeded</span>
+        <span class="badge bg-danger me-1">${batch.failed_cards} Failed</span>
+        <span class="badge bg-info me-1">${batch.total_cards} Total</span>
+    `;
 
-    if (summary.pending > 0) {
-        resultsSummary.innerHTML += '<span class="badge bg-info me-2">Pending: ' + summary.pending + '</span>';
-    }
-
-    // Build results table rows
+    // Populate results table
     resultsBody.innerHTML = '';
-    var cards = data.cards || [];
-
-    cards.forEach(function(card, index) {
-        var row = document.createElement('tr');
-
-        // Row color based on status
-        if (card.status === 'pushed') {
-            row.className = 'table-success';
-        } else if (card.status === 'failed') {
-            row.className = 'table-danger';
-        } else {
-            row.className = 'table-warning';
+    batch.cards.forEach((card, index) => {
+        let statusBadge;
+        switch (card.status) {
+            case 'completed':
+                statusBadge = '<span class="badge bg-success">Success</span>';
+                break;
+            case 'failed':
+                statusBadge = `<span class="badge bg-danger" title="${card.error_message || ''}">Failed</span>`;
+                break;
+            default:
+                statusBadge = `<span class="badge bg-secondary">${card.status}</span>`;
         }
 
-        // Status badge
-        var statusBadge = '';
-        if (card.status === 'pushed') {
-            statusBadge = '<span class="badge bg-success"><i class="bi bi-check"></i> OK</span>';
-        } else if (card.status === 'failed') {
-            statusBadge = '<span class="badge bg-danger" title="' +
-                escapeHtml(card.error_message || '') +
-                '"><i class="bi bi-x"></i> Failed</span>';
-        } else {
-            statusBadge = '<span class="badge bg-warning"><i class="bi bi-clock"></i> ' +
-                card.status + '</span>';
-        }
-
-        row.innerHTML =
-            '<td>' + (index + 1) + '</td>' +
-            '<td>' + escapeHtml(card.input_text) + '</td>' +
-            '<td>' + escapeHtml(card.target_word || '-') + '</td>' +
-            '<td>' + escapeHtml(card.explanation_word || '-') + '</td>' +
-            '<td>' + statusBadge + '</td>';
-
-        resultsBody.appendChild(row);
+        const row = `
+            <tr>
+                <td>${index + 1}</td>
+                <td>${card.word}</td>
+                <td>${card.target_word || 'N/A'}</td>
+                <td>${card.translation || 'N/A'}</td>
+                <td>${statusBadge}</td>
+            </tr>
+        `;
+        resultsBody.innerHTML += row;
     });
 
-    // Show retry button if there are failed cards
-    if (summary.failed > 0) {
+    // Show/hide retry button
+    if (batch.failed_cards > 0) {
         retrySection.classList.remove('d-none');
     } else {
         retrySection.classList.add('d-none');
     }
-
-    // Show new batch button
+    
+    // Show "New Batch" button
     newBatchBtn.style.display = 'inline-block';
-
-    // Show results section
-    resultsSection.classList.remove('d-none');
-
-    // Scroll to results
-    resultsSection.scrollIntoView({ behavior: 'smooth' });
 }
 
-// ═══════════════════════════════════════════════════════════════════
-// Escape HTML (prevent XSS)
-// ═══════════════════════════════════════════════════════════════════
-
-function escapeHtml(text) {
-    if (!text) return '';
-    var div = document.createElement('div');
-    div.appendChild(document.createTextNode(text));
-    return div.innerHTML;
-}
-
-function formatErrorField(field) {
-    if (!field) return '';
-    if (Array.isArray(field)) return field.join(' ');
-    if (typeof field === 'string') return field;
-    try { return JSON.stringify(field); } catch (e) { return String(field); }
-}
 
 // ═══════════════════════════════════════════════════════════════════
-// Retry Failed Cards
+// Reset UI for New Batch
 // ═══════════════════════════════════════════════════════════════════
 
-document.getElementById('retry-btn').addEventListener('click', async function() {
-    if (!currentBatchId) return;
-
-    var btn = this;
-    var originalHTML = '<i class="bi bi-arrow-repeat"></i> Retry Failed Cards';
-    setButtonLoading(btn, true);
-
-    var processingSection = document.getElementById('processing-section');
-    var progressBar = document.getElementById('progress-bar');
-    var processingStatus = document.getElementById('processing-status');
-
-    // Reset progress bar
-    processingSection.classList.remove('d-none');
-    progressBar.style.width = '0%';
-    progressBar.textContent = '0%';
-    progressBar.className = 'progress-bar progress-bar-striped progress-bar-animated';
-    processingStatus.textContent = 'Retrying failed cards...';
-
-    try {
-        progressBar.style.width = '30%';
-        progressBar.textContent = '30%';
-
-        var response = await fetch('/api/v1/cards/batches/' + currentBatchId + '/retry/', {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': getCookie('csrftoken'),
-                'Accept': 'application/json',
-            },
-        });
-
-        progressBar.style.width = '90%';
-        progressBar.textContent = '90%';
-
-        var data;
-        try {
-            var ct = response.headers.get('Content-Type') || '';
-            if (ct.indexOf('application/json') !== -1) {
-                data = await response.json();
-            } else {
-                var text = await response.text();
-                throw new Error('Server returned non-JSON response: ' + text);
-            }
-        } catch (e) {
-            progressBar.style.width = '100%';
-            progressBar.className = 'progress-bar bg-danger';
-            processingStatus.textContent = 'Network error.';
-            showBatchMessage('danger', '<i class="bi bi-x-circle"></i> Network error: ' + e.message);
-            setButtonLoading(btn, false, originalHTML);
-            return;
-        }
-
-        progressBar.style.width = '100%';
-        progressBar.textContent = '100%';
-        progressBar.classList.remove('progress-bar-animated');
-
-        if (response.ok) {
-            displayResults(data);
-
-            if (data.status === 'completed') {
-                progressBar.className = 'progress-bar bg-success';
-                processingStatus.textContent = 'All cards pushed successfully!';
-                showBatchMessage('success',
-                    '<i class="bi bi-check-circle"></i> Retry successful! All cards pushed.');
-            } else if (data.status === 'partial_failure') {
-                progressBar.className = 'progress-bar bg-warning';
-                processingStatus.textContent = 'Some cards still failing.';
-                showBatchMessage('warning',
-                    '<i class="bi bi-exclamation-triangle"></i> Some cards still failed after retry.');
-            } else {
-                progressBar.className = 'progress-bar bg-danger';
-                processingStatus.textContent = 'Retry failed.';
-                showBatchMessage('danger', '<i class="bi bi-x-circle"></i> Retry failed.');
-            }
-
-        } else {
-            progressBar.className = 'progress-bar bg-danger';
-            processingStatus.textContent = 'Retry error.';
-            showBatchMessage('danger', '<i class="bi bi-x-circle"></i> ' + (data.error || data.message || 'Retry failed.'));
-        }
-
-    } catch (e) {
-        progressBar.style.width = '100%';
-        progressBar.className = 'progress-bar bg-danger';
-        processingStatus.textContent = 'Network error.';
-        showBatchMessage('danger', '<i class="bi bi-x-circle"></i> Network error: ' + e.message);
-    }
-
-    setButtonLoading(btn, false, originalHTML);
-});
-
-// ═══════════════════════════════════════════════════════════════════
-// New Batch Button — Reset Form
-// ═══════════════════════════════════════════════════════════════════
-
-document.getElementById('new-batch-btn').addEventListener('click', function() {
-    // Clear input
-    document.getElementById('vocabulary-input').value = '';
-    updateWordCount();
-
-    // Hide results and processing
-    document.getElementById('results-section').classList.add('d-none');
-    document.getElementById('processing-section').classList.add('d-none');
-    document.getElementById('batch-message').classList.add('d-none');
-
-    // Hide new batch button
-    this.style.display = 'none';
-
-    // Reset progress bar
-    var progressBar = document.getElementById('progress-bar');
-    progressBar.style.width = '0%';
-    progressBar.textContent = '0%';
-    progressBar.className = 'progress-bar progress-bar-striped progress-bar-animated';
-
+function resetForNewBatch() {
     // Reset state
     currentBatchId = null;
 
+    // Clear inputs and counts
+    document.getElementById('vocabulary-input').value = '';
+    updateWordCount();
+
+    // Hide results and processing sections
+    document.getElementById('results-section').classList.add('d-none');
+    document.getElementById('processing-section').classList.add('d-none');
+    
+    // Reset progress bar
+    updateProgress(null);
+
+    // Show the main form
+    document.getElementById('batch-creation-form').classList.remove('d-none');
+    
+    // Reset buttons
+    document.getElementById('new-batch-btn').style.display = 'none';
+    document.getElementById('retry-section').classList.add('d-none');
+    
     // Scroll to top
     window.scrollTo({ top: 0, behavior: 'smooth' });
+}
 
-    // Focus on textarea
-    document.getElementById('vocabulary-input').focus();
-});
 
 // ═══════════════════════════════════════════════════════════════════
 // Initialize on Page Load
@@ -812,8 +841,116 @@ document.getElementById('new-batch-btn').addEventListener('click', function() {
 document.addEventListener('DOMContentLoaded', function() {
     loadLanguages();
     updateWordCount();
+    checkAnkiConnection(); // Check Anki connection on page load
 });
 
 </script>
+
+<style>
+  @keyframes pulse {
+    0%, 100% {
+      border-width: 2px;
+      box-shadow: 0 0 0 0 rgba(30, 60, 114, 0.4);
+    }
+    50% {
+      border-width: 3px;
+      box-shadow: 0 0 20px 5px rgba(42, 82, 152, 0.3);
+    }
+  }
+  
+  @keyframes slideIn {
+    from { opacity: 0; transform: scale(0.9); }
+    to { opacity: 1; transform: scale(1); }
+  }
+  
+  @keyframes bounce {
+    0%, 100% { transform: translateX(0); }
+    50% { transform: translateX(3px); }
+  }
+  
+  #anki-status-warning {
+    border-width: 2px !important;
+  }
+  
+  .anki-quick-fix {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 1rem;
+    margin: 1rem 0;
+    flex-wrap: wrap;
+  }
+  
+  .fix-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    background: rgba(255, 255, 255, 0.15);
+    padding: 1rem;
+    border-radius: 12px;
+    min-width: 120px;
+    animation: slideIn 0.4s ease-out;
+    transition: transform 0.3s ease;
+  }
+  
+  .fix-step:hover {
+    transform: translateY(-3px);
+  }
+  
+  .fix-step:nth-child(1) { animation-delay: 0s; }
+  .fix-step:nth-child(3) { animation-delay: 0.1s; }
+  .fix-step:nth-child(5) { animation-delay: 0.2s; }
+  
+  .fix-number {
+    background: #ffc107;
+    color: #000;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 0.9rem;
+  }
+  
+  .fix-icon {
+    font-size: 1.8rem;
+    color: #fff;
+  }
+  
+  .fix-label {
+    color: #fff;
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-align: center;
+    line-height: 1.2;
+  }
+  
+  .fix-label small {
+    display: block;
+    font-size: 0.75rem;
+    color: #ffc107;
+    font-weight: bold;
+    margin-top: 0.25rem;
+  }
+  
+  .fix-arrow {
+    color: #ffc107;
+    font-size: 1.5rem;
+    animation: bounce 1.5s ease-in-out infinite;
+  }
+  
+  @media (max-width: 576px) {
+    .anki-quick-fix {
+      flex-direction: column;
+    }
+    
+    .fix-arrow {
+      transform: rotate(90deg);
+    }
+  }
+</style>
 
 {% endblock %}

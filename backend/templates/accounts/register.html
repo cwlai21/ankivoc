@@ -5,13 +5,89 @@
 {% block content %}
 <div class="row justify-content-center">
   <div class="col-md-6">
-    <div class="card mt-5">
+    <!-- Registration Form Card -->
+    <div class="card mt-5" id="registerCard" {% if show_verification %}style="display: none;"{% endif %}>
       <div class="card-body">
         <h3 class="card-title mb-4">Register</h3>
         
-        <div id="anki-status-alert" class="alert alert-warning d-none" role="alert">
-          <strong>⚠️ Anki Setup Required</strong>
-          <p class="mb-0 mt-2">Please ensure Anki Desktop is running with AnkiConnect add-on installed.</p>
+        <!-- Enhanced Anki Status Warning - Visual Animated Guide -->
+        <div id="anki-status-alert" class="alert alert-primary border-primary d-none shadow-lg" role="alert" style="animation: pulse 2s infinite; background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); border-color: #1e3c72 !important;">
+          <div class="text-center mb-3">
+            <h4 class="alert-heading mb-2">
+              <i class="bi bi-exclamation-triangle-fill" style="font-size: 2rem;"></i>
+              <strong>Anki Setup Required!</strong>
+            </h4>
+            <p class="mb-0"><strong>Registration cannot proceed without Anki Desktop</strong></p>
+          </div>
+          
+          <!-- Visual Step-by-Step Guide -->
+          <div class="anki-setup-flow">
+            <div class="setup-step">
+              <div class="step-number">1</div>
+              <div class="step-icon">
+                <i class="bi bi-laptop"></i>
+              </div>
+              <div class="step-content">
+                <strong>Open Anki Desktop</strong>
+                <small>Launch the application</small>
+              </div>
+            </div>
+            
+            <div class="setup-arrow">
+              <i class="bi bi-arrow-down"></i>
+            </div>
+            
+            <div class="setup-step">
+              <div class="step-number">2</div>
+              <div class="step-icon">
+                <i class="bi bi-puzzle"></i>
+              </div>
+              <div class="step-content">
+                <strong>Install AnkiConnect</strong>
+                <small>Tools → Add-ons → Get Add-ons</small>
+                <div class="addon-code">Code: <strong>2055492159</strong></div>
+              </div>
+            </div>
+            
+            <div class="setup-arrow">
+              <i class="bi bi-arrow-down"></i>
+            </div>
+            
+            <div class="setup-step">
+              <div class="step-number">3</div>
+              <div class="step-icon">
+                <i class="bi bi-arrow-clockwise"></i>
+              </div>
+              <div class="step-content">
+                <strong>Restart Anki</strong>
+                <small>Close and reopen Anki</small>
+              </div>
+            </div>
+            
+            <div class="setup-arrow">
+              <i class="bi bi-arrow-down"></i>
+            </div>
+            
+            <div class="setup-step">
+              <div class="step-number">4</div>
+              <div class="step-icon">
+                <i class="bi bi-check-circle"></i>
+              </div>
+              <div class="step-content">
+                <strong>Check Connection</strong>
+                <small>Click button below</small>
+              </div>
+            </div>
+          </div>
+          
+          <div class="d-flex gap-2 flex-wrap justify-content-center mt-4">
+            <button type="button" class="btn btn-warning" onclick="checkAnkiStatus()">
+              <i class="bi bi-arrow-clockwise"></i> Check Connection Now
+            </button>
+            <a href="https://ankiweb.net/shared/info/2055492159" target="_blank" class="btn btn-outline-light">
+              <i class="bi bi-box-arrow-up-right"></i> AnkiConnect Details
+            </a>
+          </div>
         </div>
 
         <form method="post" id="registerForm">
@@ -87,7 +163,7 @@
               name="language_preference">
               <option value="">Select a language...</option>
               {% for lang in languages %}
-                <option value="{{ lang.id }}" {% if form.language_preference.value == lang.id|stringformat:"s" %}selected{% endif %}>
+                <option value="{{ lang.id }}" {% if form.language_preference.value == lang.id|stringformat:"s" or not form.language_preference.value and lang.name == 'English' %}selected{% endif %}>
                   {{ lang.name }}
                 </option>
               {% endfor %}
@@ -109,8 +185,199 @@
         </form>
       </div>
     </div>
+    
+    <!-- Email Verification Card -->
+    <div class="card mt-5" id="verificationCard" {% if not show_verification %}style="display: none;"{% endif %}>
+      <div class="card-body">
+        <div class="text-center mb-4">
+          <i class="bi bi-envelope-check" style="font-size: 3rem; color: #0d6efd;"></i>
+          <h3 class="card-title mt-3">Verify Your Email</h3>
+          <p class="text-muted">We've sent a 6-digit verification code to</p>
+          <p class="fw-bold text-primary">{{ user_email }}</p>
+        </div>
+        
+        <form method="post" action="{% url 'accounts-web:verify-code' %}" id="verifyCodeForm">
+          {% csrf_token %}
+          <div class="mb-3">
+            <label for="verification_code" class="form-label text-center d-block">Enter Verification Code</label>
+            <input 
+              type="text" 
+              class="form-control text-center" 
+              id="verification_code" 
+              name="verification_code"
+              maxlength="6"
+              pattern="[0-9]{6}"
+              placeholder="000000"
+              style="font-size: 1.5rem; letter-spacing: 0.5rem; font-weight: bold;"
+              required
+              autofocus>
+            <small class="form-text text-muted d-block text-center mt-2">
+              <i class="bi bi-clock"></i> Code expires in 15 minutes
+            </small>
+          </div>
+
+          <div class="d-grid gap-2 mb-3">
+            <button type="submit" class="btn btn-primary btn-lg">
+              <i class="bi bi-check-circle"></i> Verify Email
+            </button>
+          </div>
+        </form>
+        
+        <div class="text-center mt-3">
+          <p class="text-muted mb-2">Didn't receive the code?</p>
+          <form method="post" action="{% url 'accounts-web:resend-code' %}" id="resendCodeForm" class="d-inline">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-outline-secondary btn-sm">
+              <i class="bi bi-arrow-clockwise"></i> Resend Code
+            </button>
+          </form>
+        </div>
+        
+        <div class="alert alert-info mt-3" role="alert">
+          <small>
+            <i class="bi bi-info-circle"></i> 
+            Check your spam folder if you don't see the email in your inbox.
+          </small>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
+
+<style>
+  @keyframes pulse {
+    0%, 100% {
+      border-width: 2px;
+      box-shadow: 0 0 0 0 rgba(30, 60, 114, 0.4);
+    }
+    50% {
+      border-width: 3px;
+      box-shadow: 0 0 20px 5px rgba(42, 82, 152, 0.3);
+    }
+  }
+  
+  @keyframes slideDown {
+    0% { opacity: 0; transform: translateY(-10px); }
+    100% { opacity: 1; transform: translateY(0); }
+  }
+  
+  @keyframes bounceArrow {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(5px); }
+  }
+  
+  @keyframes glowCode {
+    0%, 100% { box-shadow: 0 0 5px rgba(255, 193, 7, 0.5); }
+    50% { box-shadow: 0 0 15px rgba(255, 193, 7, 0.8); }
+  }
+  
+  #anki-status-alert {
+    border-width: 2px !important;
+  }
+  
+  .anki-setup-flow {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+    margin: 1.5rem 0;
+  }
+  
+  .setup-step {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    background: rgba(255, 255, 255, 0.15);
+    padding: 1rem 1.5rem;
+    border-radius: 15px;
+    width: 100%;
+    max-width: 450px;
+    position: relative;
+    animation: slideDown 0.5s ease-out;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+  }
+  
+  .setup-step:hover {
+    transform: scale(1.02);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+  }
+  
+  .setup-step:nth-child(1) { animation-delay: 0s; }
+  .setup-step:nth-child(3) { animation-delay: 0.1s; }
+  .setup-step:nth-child(5) { animation-delay: 0.2s; }
+  .setup-step:nth-child(7) { animation-delay: 0.3s; }
+  
+  .step-number {
+    background: #ffc107;
+    color: #000;
+    width: 35px;
+    height: 35px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 1.1rem;
+    flex-shrink: 0;
+  }
+  
+  .step-icon {
+    font-size: 2rem;
+    color: #fff;
+    flex-shrink: 0;
+  }
+  
+  .step-content {
+    flex-grow: 1;
+    color: #fff;
+  }
+  
+  .step-content strong {
+    display: block;
+    font-size: 1rem;
+    margin-bottom: 0.25rem;
+  }
+  
+  .step-content small {
+    display: block;
+    opacity: 0.9;
+    font-size: 0.85rem;
+  }
+  
+  .addon-code {
+    margin-top: 0.5rem;
+    padding: 0.5rem;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 8px;
+    text-align: center;
+    animation: glowCode 2s infinite;
+  }
+  
+  .addon-code strong {
+    font-size: 1.2rem;
+    letter-spacing: 2px;
+    color: #ffc107;
+  }
+  
+  .setup-arrow {
+    color: #ffc107;
+    font-size: 1.5rem;
+    margin: 0.5rem 0;
+    animation: bounceArrow 1.5s ease-in-out infinite;
+  }
+  
+  @media (max-width: 576px) {
+    .setup-step {
+      flex-direction: column;
+      text-align: center;
+      padding: 1rem;
+    }
+    
+    .step-icon {
+      font-size: 1.5rem;
+    }
+  }
+</style>
 
 <script>
   // Check Anki status on page load
@@ -119,6 +386,9 @@
   });
 
   async function checkAnkiStatus() {
+    const alert = document.getElementById('anki-status-alert');
+    const submitButton = document.querySelector('button[type="submit"]');
+    
     try {
       const response = await fetch('http://localhost:8765', {
         method: 'POST',
@@ -128,14 +398,23 @@
       
       if (!response.ok) {
         showAnkiWarning();
+        if (submitButton) submitButton.disabled = true;
       } else {
         const data = await response.json();
         if (!data.result) {
           showAnkiWarning();
+          if (submitButton) submitButton.disabled = true;
+        } else {
+          // Anki is connected successfully
+          if (alert) {
+            alert.classList.add('d-none');
+          }
+          if (submitButton) submitButton.disabled = false;
         }
       }
     } catch (error) {
       showAnkiWarning();
+      if (submitButton) submitButton.disabled = true;
     }
   }
 
@@ -143,6 +422,8 @@
     const alert = document.getElementById('anki-status-alert');
     if (alert) {
       alert.classList.remove('d-none');
+      // Scroll to the alert so user sees it
+      alert.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
   }
 </script>

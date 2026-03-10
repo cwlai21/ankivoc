@@ -3,9 +3,16 @@ from django.urls import path, include
 from django.views.generic import RedirectView
 from django.conf import settings
 from django.conf.urls.static import static
+from django.views.static import serve as static_serve
+import os
 
 
 urlpatterns = [
+    # Service worker (must be at root scope for notification permissions)
+    path('sw-notif.js', static_serve, {
+        'path': 'js/sw-notif.js',
+        'document_root': os.path.join(settings.BASE_DIR, 'static'),
+    }),
     # Redirect root to batches list (site homepage)
     path('', RedirectView.as_view(url='/cards/batches/', permanent=False)),
     # Admin panel

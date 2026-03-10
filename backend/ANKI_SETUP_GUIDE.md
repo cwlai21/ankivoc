@@ -49,7 +49,7 @@ HTTP 424 Failed Dependency
     "ankiconnect_installed": false,
     "version": null,
     "download_url": "/api/v1/auth/download-ankiconnect/",
-    "ankiweb_url": "https://ankiweb.net/shared/info/2055492159"
+    "ankiweb_url": "https://ankiweb.net/shared/ifo/2055492159"
   }
 }
 ```

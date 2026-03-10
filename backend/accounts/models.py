@@ -1,5 +1,8 @@
 from django.contrib.auth.models import AbstractUser, Group, Permission
 from django.db import models
+from django.utils import timezone
+import random
+import string
 
 
 class User(AbstractUser):
@@ -81,6 +84,28 @@ class User(AbstractUser):
 		help_text='Detected AnkiConnect version number'
 	)
 
+	# ── Email Verification ──
+	email_verified = models.BooleanField(
+		default=False,
+		help_text='Whether user has verified their email address'
+	)
+	verification_code = models.CharField(
+		max_length=6,
+		blank=True,
+		null=True,
+		help_text='6-digit code for email verification'
+	)
+	verification_code_created = models.DateTimeField(
+		null=True,
+		blank=True,
+		help_text='When the verification code was created'
+	)
+	verification_code_expires = models.DateTimeField(
+		null=True,
+		blank=True,
+		help_text='When the verification code expires'
+	)
+
 	class Meta:
 		db_table = 'users'
 		verbose_name = 'User'
@@ -88,3 +113,22 @@ class User(AbstractUser):
 
 	def __str__(self):
 		return self.username
+	
+	def generate_verification_code(self):
+		"""Generate a 6-digit verification code and set expiration time"""
+		self.verification_code = ''.join(random.choices(string.digits, k=6))
+		self.verification_code_created = timezone.now()
+		# Code expires in 15 minutes
+		self.verification_code_expires = timezone.now() + timezone.timedelta(minutes=15)
+		self.save(update_fields=['verification_code', 'verification_code_created', 'verification_code_expires'])
+		return self.verification_code
+	
+	def is_verification_code_valid(self, code):
+		"""Check if the provided code matches and hasn't expired"""
+		if not self.verification_code or not self.verification_code_expires:
+			return False
+		if self.verification_code != code:
+			return False
+		if timezone.now() > self.verification_code_expires:
+			return False
+		return True

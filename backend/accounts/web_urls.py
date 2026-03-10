@@ -14,13 +14,23 @@ urlpatterns = [
     ),
     path(
         'logout/',
-        auth_views.LogoutView.as_view(),
+        views.WebLogoutView.as_view(),
         name='logout',
     ),
     path(
         'register/',
         views.RegisterView.as_view(),
         name='register',
+    ),
+    path(
+        'verify-code/',
+        views.VerifyCodeView.as_view(),
+        name='verify-code',
+    ),
+    path(
+        'resend-code/',
+        views.ResendCodeView.as_view(),
+        name='resend-code',
     ),
     path(
         'profile/',

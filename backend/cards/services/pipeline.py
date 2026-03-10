@@ -1,4 +1,6 @@
 import logging
+import re
+import time
 import concurrent.futures
 from django.conf import settings
 from .llm_translator import LLMTranslator, LLMTranslationError
@@ -714,16 +716,33 @@ else if (word.includes('\uc744') || word.includes('\ub97c')){{ // 을/를
         self.batch.status = VocabularyBatch.Status.TRANSLATING
         self.batch.save()
  
-        try:
-            result = self._run_with_timeout(
-                self.translator.translate,
-                self._llm_timeout,
-                card.input_text,
-                self.target_lang.code,
-                self.explanation_lang.code,
-            )
-        except concurrent.futures.TimeoutError:
-            raise LLMTranslationError(f'LLM call timed out after {self._llm_timeout}s')
+        max_retries = 3
+        retry_delay = 5  # seconds
+
+        for attempt in range(max_retries):
+            try:
+                result = self._run_with_timeout(
+                    self.translator.translate,
+                    self._llm_timeout,
+                    card.input_text,
+                    self.target_lang.code,
+                    self.explanation_lang.code,
+                )
+                break  # Success, exit loop
+            except concurrent.futures.TimeoutError:
+                raise LLMTranslationError(f'LLM call timed out after {self._llm_timeout}s')
+            except LLMTranslationError as e:
+                if "503" in str(e) and attempt < max_retries - 1:
+                    logger.warning(
+                        f"LLM service unavailable (503). Retrying in {retry_delay} seconds... "
+                        f"(Attempt {attempt + 1}/{max_retries})"
+                    )
+                    time.sleep(retry_delay)
+                else:
+                    raise  # Re-raise the exception if it's not a 503 or it's the last attempt
+        else:
+            # This block executes if the loop completes without a `break`
+            raise LLMTranslationError(f"LLM translation failed after {max_retries} attempts.")
  
         # Populate card fields from LLM result
         card.target_word = result.get('target_word', card.input_text)
@@ -756,6 +775,7 @@ else if (word.includes('\uc744') || word.includes('\ub97c')){{ // 을/를
                 # to avoid duplicating (e.g. "du cabaret" -> "du du cabaret").
                 preposition_prefixes = [
                     "du ", "de la ", "de l'", "des ", "au ", "aux ",
+                    "un ", "une ",
                 ]
                 lower_front = front.lower()
                 if any(lower_front.startswith(p) for p in preposition_prefixes):
@@ -765,7 +785,7 @@ else if (word.includes('\uc744') || word.includes('\ub97c')){{ // 을/를
                     )
                 else:
                     # Check and remove simple existing articles before recomputing
-                    existing_articles = ["l'", "le ", "la ", "les "]
+                    existing_articles = ["l'", "le ", "la ", "les ", "un ", "une "]
                     for existing_article in existing_articles:
                         if lower_front.startswith(existing_article):
                             front = front[len(existing_article):].lstrip()
@@ -781,10 +801,32 @@ else if (word.includes('\uc744') || word.includes('\ub97c')){{ // 을/를
                     conjugaison_lower = conjugaison_genre.lower()
                     is_masculin = 'masculin' in conjugaison_lower or 'masculine' in conjugaison_lower or 'm.' in conjugaison_lower
                     is_feminin = 'feminin' in conjugaison_lower or 'féminin' in conjugaison_lower or 'feminine' in conjugaison_lower or 'f.' in conjugaison_lower
-                    is_pluriel = 'pluriel' in conjugaison_lower or 'plural' in conjugaison_lower
+                    
+                    # New logic to handle incorrect 'pluriel' from AI
+                    ignore_pluriel = False
+                    if 'pluriel' in conjugaison_lower:
+                        # Extract the word from 'pluriel: ...'
+                        plural_form_match = re.search(r'pluriel\s*:\s*(\w+)', conjugaison_lower)
+                        if plural_form_match:
+                            plural_form = plural_form_match.group(1)
+                            # Check if the plural form is just the cleaned word + 's' or 'x'
+                            if plural_form.startswith(cleaned_word.lower()) and plural_form.endswith(('s', 'x')):
+                                # This is likely a case like "égout" -> "égouts"
+                                # where the base word is singular.
+                                ignore_pluriel = True
+                                logger.info(
+                                    "Detected a potentially incorrect 'pluriel' for '%s' (plural form: '%s'). "
+                                    "Ignoring 'pluriel' and using gender.",
+                                    cleaned_word, plural_form
+                                )
+
+                    is_plural = 'pluriel' in conjugaison_lower and not ignore_pluriel
+
+                    # Check if the original word already starts with a plural article
+                    original_is_plural = target_word.lower().startswith(('des ', 'les '))
 
                     article = ''
-                    if is_pluriel:
+                    if is_plural and not original_is_plural:
                         article = 'des'
                     elif is_masculin:
                         if starts_with_vowel:
@@ -911,75 +953,78 @@ else if (word.includes('\uc744') || word.includes('\ub97c')){{ // 을/를
         target_code = self.target_lang.code.upper()
         explanation_code = self.explanation_lang.code.upper()
         
-        # Build desired_keys dynamically based on current languages
-        desired_keys = {
-            native_name.lower(): native_name,
-            explanation_name.lower(): 'Explanation',  # Map to generic field
-            'explanation': 'Explanation',  # Generic field
-            'synonyme': 'Synonyme',
-            'synonym': 'Synonyme',
-            'conjugaison/gender': 'Conjugaison/Gender',
-            f'exemple-{target_code}'.lower(): f'exemple-{target_code}',
-            'exemple-explanation': 'exemple-Explanation',  # Generic field
-            f'exemple-{explanation_code}'.lower(): 'exemple-Explanation',  # Map to generic
-            f'exemple2-{target_code}'.lower(): f'exemple2-{target_code}',
-            'exemple2-explanation': 'exemple2-Explanation',  # Generic field
-            f'exemple2-{explanation_code}'.lower(): 'exemple2-Explanation',  # Map to generic
-            'extend': 'Extend',
-            'hint': 'Hint',
-            # Legacy French mappings for backward compatibility
-            'français': 'Français',
-            'french': 'French',
-            'english': 'Explanation',  # Map to generic
-            'exemple-fr': 'exemple-Explanation',
-            'exemple-en': 'exemple-Explanation',
-            'exemple2-fr': 'exemple2-Explanation',
-            'exemple2-en': 'exemple2-Explanation',
-        }
-
         # Query Anki for the actual model field names for this model.
         try:
             actual_model_fields = self.anki._invoke('modelFieldNames', modelName=model_name) or []
         except Exception:
             actual_model_fields = list(self.template.fields_definition or [])
 
-        # Build case-insensitive lookup
-        model_map = {f.lower(): f for f in actual_model_fields}
+        # Build case-insensitive lookup: lowercase → actual field name
+        # Only keep the FIRST occurrence for each lowercase key to prefer
+        # original fields over polluted duplicates (e.g. 'Exemple-FR' over 'exemple-FR+').
+        model_map = {}
+        for f in actual_model_fields:
+            lk = f.lower()
+            if lk not in model_map:
+                model_map[lk] = f
 
-        def pick_actual(key_variants):
-            for v in key_variants:
-                if v.lower() in model_map:
-                    return model_map[v.lower()]
-            # substring fallback
-            for v in key_variants:
-                lv = v.lower()
-                for lower, real in model_map.items():
-                    if lv in lower:
-                        return real
-            return None
+        def resolve_field(*candidates):
+            """Return the actual Anki model field name for the first matching candidate."""
+            for c in candidates:
+                actual = model_map.get(c.lower())
+                if actual:
+                    return actual
+            return candidates[0] if candidates else None
 
-        # Map pipeline values into the exact model field names (dynamically)
+        # Map pipeline values directly to actual Anki model field names.
+        # Try multiple candidate names for each field to handle both legacy
+        # models (e.g. 'English', 'Exemple-EN') and new generic models
+        # (e.g. 'Explanation', 'exemple-Explanation').
         fields = {}
-        mapping = {
-            native_name: card.target_word,
-            'Explanation': card.explanation_word,  # Generic field for any explanation language
-            'Synonyme': card.synonyme,
-            'Conjugaison/Gender': card.conjugaison_genre,
-            'Audio': '',  # Will be filled by AnkiConnect when audio_files provided
-            f'exemple-{target_code}': card.exemple_target,
-            'exemple-Explanation': card.exemple_explanation,  # Generic field
-            'exemple1-Audio': '',  # Will be filled by AnkiConnect
-            f'exemple2-{target_code}': card.exemple2_target,
-            'exemple2-Explanation': card.exemple2_explanation,  # Generic field
-            'exemple2-Audio': '',  # Will be filled by AnkiConnect
-            'Extend': card.extend,
-            'Hint': card.hint,
-        }
 
-        for k, v in mapping.items():
-            actual = pick_actual([k, desired_keys.get(k.lower(), k)]) or k
-            # Convert None to empty string - Anki rejects notes with all None values
-            fields[actual] = v if v is not None else ''
+        # Target word
+        fields[resolve_field(native_name)] = card.target_word or ''
+
+        # Explanation: prefer language-specific name (e.g. 'English'), fallback to generic
+        expl_field = resolve_field(explanation_name, 'Explanation')
+        fields[expl_field] = card.explanation_word or ''
+        # Also populate generic 'Explanation' if it exists as a separate field
+        expl_generic = model_map.get('explanation')
+        if expl_generic and expl_generic != expl_field:
+            fields[expl_generic] = card.explanation_word or ''
+
+        fields[resolve_field('Synonyme')] = card.synonyme or ''
+        fields[resolve_field('Conjugaison/Gender')] = card.conjugaison_genre or ''
+        fields[resolve_field('Audio')] = ''  # Filled by AnkiConnect audio attachment
+
+        # Example 1 target: try 'Exemple-FR' (legacy) then 'exemple-FR' (generic)
+        fields[resolve_field(f'Exemple-{target_code}', f'exemple-{target_code}')] = card.exemple_target or ''
+
+        # Example 1 explanation: try 'Exemple-EN' (legacy) then 'exemple-Explanation' (generic)
+        fields[resolve_field(
+            f'Exemple-{explanation_code}', f'exemple-{explanation_code}',
+            'exemple-Explanation'
+        )] = card.exemple_explanation or ''
+
+        # Example 1 audio
+        fields[resolve_field('Exemple1-Audio', 'exemple1-Audio')] = ''
+
+        # Example 2 target
+        fields[resolve_field(f'Exemple2-{target_code}', f'exemple2-{target_code}')] = card.exemple2_target or ''
+
+        # Example 2 explanation
+        fields[resolve_field(
+            f'Exemple2-{explanation_code}', f'exemple2-{explanation_code}',
+            'exemple2-Explanation'
+        )] = card.exemple2_explanation or ''
+
+        # Example 2 audio
+        fields[resolve_field('Exemple2-Audio', 'exemple2-Audio')] = ''
+
+        fields[resolve_field('Extend')] = card.extend or ''
+        fields[resolve_field('Hint')] = card.hint or ''
+
+        logger.info(f'  Field mapping for card #{card.id}: {list(fields.keys())}')
  
         # Build audio files dict
         # Determine the exact field names from the template so AnkiConnect
@@ -991,61 +1036,25 @@ else if (word.includes('\uc744') || word.includes('\ub97c')){{ // 을/를
         from pathlib import Path
         media_root = Path(settings.MEDIA_ROOT)
 
-        template_fields = []
-        try:
-            template_fields = [f for f in self.template.fields_definition]
-        except Exception:
-            template_fields = list(fields.keys())
+        # Use actual model fields for audio mapping (not template fields)
+        # to avoid case mismatches between template and Anki model.
 
-        def find_field(containing=None, not_containing=None):
-            """Return first template field name that contains all substrings
-            in `containing` (case-insensitive) and does not contain any of
-            `not_containing`. Returns None if not found."""
-            lc = [t.lower() for t in template_fields]
-            if containing:
-                for i, t in enumerate(lc):
-                    if all(p.lower() in t for p in containing):
-                        if not not_containing or all(n.lower() not in t for n in not_containing):
-                            return template_fields[i]
-            else:
-                for i, t in enumerate(lc):
-                    if not not_containing or all(n.lower() not in t for n in not_containing):
-                        return template_fields[i]
-            return None
-
-        # Word audio: prefer a field that contains 'audio' but not 'exemple'
+        # Word audio: the 'Audio' field
         if card.audio_file:
-            word_field = find_field(containing=['audio'], not_containing=['exemple'])
-            if not word_field:
-                # fallback to any field named like 'audio' or to the French text field
-                word_field = find_field(containing=['audio']) or 'Français'
-            # map template field -> actual model field name when possible
-            actual_word_field = pick_actual([word_field]) or model_map.get(word_field.lower()) or word_field
-            audio_files[actual_word_field] = media_root / str(card.audio_file)
+            audio_field = resolve_field('Audio')
+            audio_files[audio_field] = media_root / str(card.audio_file)
 
-        # Example 1 audio: look for 'exemple1' + 'audio', then 'exemple'+'audio', then any 'exemple'
+        # Example 1 audio
         if card.exemple1_audio:
-            ex1_field = find_field(containing=['exemple1', 'audio'])
-            if not ex1_field:
-                ex1_field = find_field(containing=['exemple', 'audio'])
-            if not ex1_field:
-                ex1_field = find_field(containing=['exemple'])
-            if ex1_field:
-                actual_ex1 = pick_actual([ex1_field]) or model_map.get(ex1_field.lower()) or ex1_field
-                audio_files[actual_ex1] = media_root / str(card.exemple1_audio)
+            ex1_audio_field = resolve_field('Exemple1-Audio', 'exemple1-Audio')
+            if ex1_audio_field:
+                audio_files[ex1_audio_field] = media_root / str(card.exemple1_audio)
 
-        # Example 2 audio: similar logic to example 1
+        # Example 2 audio
         if card.exemple2_audio:
-            ex2_field = find_field(containing=['exemple2', 'audio'])
-            if not ex2_field:
-                ex2_field = find_field(containing=['exemple2'])
-            if not ex2_field:
-                ex2_field = find_field(containing=['exemple', 'audio'])
-            if not ex2_field:
-                ex2_field = find_field(containing=['exemple'])
-            if ex2_field:
-                actual_ex2 = pick_actual([ex2_field]) or model_map.get(ex2_field.lower()) or ex2_field
-                audio_files[actual_ex2] = media_root / str(card.exemple2_audio)
+            ex2_audio_field = resolve_field('Exemple2-Audio', 'exemple2-Audio')
+            if ex2_audio_field:
+                audio_files[ex2_audio_field] = media_root / str(card.exemple2_audio)
 
         # If no audio files were prepared, retry TTS generation once and rebuild
         # the `audio_files` mapping. This helps when transient TTS failures
@@ -1108,36 +1117,20 @@ else if (word.includes('\uc744') || word.includes('\ub97c')){{ // 을/를
                 # Persist any new audio paths and rebuild mapping
                 card.save()
 
-                # rebuild audio_files mapping
+                # rebuild audio_files mapping using resolve_field
                 audio_files = {}
                 if card.audio_file:
-                    word_field = find_field(containing=['audio'], not_containing=['exemple'])
-                    if not word_field:
-                        word_field = find_field(containing=['audio']) or 'Français'
-                    actual_word_field = pick_actual([word_field]) or model_map.get(word_field.lower()) or word_field
-                    audio_files[actual_word_field] = media_root / str(card.audio_file)
+                    audio_files[resolve_field('Audio')] = media_root / str(card.audio_file)
 
                 if card.exemple1_audio:
-                    ex1_field = find_field(containing=['exemple1', 'audio'])
-                    if not ex1_field:
-                        ex1_field = find_field(containing=['exemple', 'audio'])
-                    if not ex1_field:
-                        ex1_field = find_field(containing=['exemple'])
-                    if ex1_field:
-                        actual_ex1 = pick_actual([ex1_field]) or model_map.get(ex1_field.lower()) or ex1_field
-                        audio_files[actual_ex1] = media_root / str(card.exemple1_audio)
+                    ex1_af = resolve_field('Exemple1-Audio', 'exemple1-Audio')
+                    if ex1_af:
+                        audio_files[ex1_af] = media_root / str(card.exemple1_audio)
 
                 if card.exemple2_audio:
-                    ex2_field = find_field(containing=['exemple2', 'audio'])
-                    if not ex2_field:
-                        ex2_field = find_field(containing=['exemple2'])
-                    if not ex2_field:
-                        ex2_field = find_field(containing=['exemple', 'audio'])
-                    if not ex2_field:
-                        ex2_field = find_field(containing=['exemple'])
-                    if ex2_field:
-                        actual_ex2 = pick_actual([ex2_field]) or model_map.get(ex2_field.lower()) or ex2_field
-                        audio_files[actual_ex2] = media_root / str(card.exemple2_audio)
+                    ex2_af = resolve_field('Exemple2-Audio', 'exemple2-Audio')
+                    if ex2_af:
+                        audio_files[ex2_af] = media_root / str(card.exemple2_audio)
             except Exception as e:
                 logger.warning('TTS retry failed for card #%d: %s', card.id, e)
  

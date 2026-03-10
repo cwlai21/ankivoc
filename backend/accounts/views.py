@@ -4,12 +4,16 @@ from rest_framework.views import APIView
 from rest_framework.authtoken.models import Token
 from django.utils import timezone
 from django.db import transaction
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
-from django.contrib.auth import authenticate, login as django_login
+from django.contrib.auth import authenticate, login as django_login, logout as django_logout
 from django.views import View
+from django.core.mail import send_mail
+from django.template.loader import render_to_string
+from django.conf import settings
 from languages.models import Language
 from cards.services.anki_connect import AnkiConnectClient
+from .models import User
 from .serializers import (
     RegisterSerializer,
     LoginSerializer,
@@ -104,22 +108,54 @@ class RegisterView(APIView):
         user.ankiconnect_version = anki_status['version']
         user.save(update_fields=['anki_last_checked', 'anki_setup_completed', 'ankiconnect_version'])
         
+        # Generate verification code
+        verification_code = user.generate_verification_code()
+        
+        # Send verification email
+        email_html = render_to_string('accounts/verification_email.html', {
+            'user': user,
+            'verification_code': verification_code,
+        })
+        email_text = render_to_string('accounts/verification_email.txt', {
+            'user': user,
+            'verification_code': verification_code,
+        })
+        
+        send_mail(
+            subject='Anki Vocabulary Builder Email Verification Code',
+            message=email_text,
+            html_message=email_html,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[user.email],
+            fail_silently=False,
+        )
+        
         # Create auth token
         token, _ = Token.objects.get_or_create(user=user)
 
         # Handle HTML form submission
         if is_html_form:
-            messages.success(request, 'Registration successful! You can now log in.')
-            return redirect('accounts-web:login')
+            # Store user_id in session for verification
+            request.session['pending_verification_user_id'] = user.id
+            request.session['pending_verification_email'] = user.email
+            messages.success(request, 'Registration successful! Please check your email for the verification code.')
+            # Don't redirect - stay on the page to show verification code form
+            languages = Language.objects.all().order_by('name')
+            return render(request, 'accounts/register.html', {
+                'languages': languages,
+                'show_verification': True,
+                'user_email': user.email,
+            })
         
         # Handle API request
         return Response({
-            'message': 'Registration successful.',
+            'message': 'Registration successful. Please check your email to verify your account.',
             'token': token.key,
             'user': {
                 'id': user.id,
                 'username': user.username,
                 'email': user.email,
+                'email_verified': user.email_verified,
             },
             'anki_status': anki_status,
         }, status=status.HTTP_201_CREATED)
@@ -137,6 +173,13 @@ class LoginView(APIView):
         serializer = LoginSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.validated_data['user']
+        
+        # Check if email is verified
+        if not user.email_verified:
+            return Response({
+                'error': 'Email not verified',
+                'message': 'Please verify your email address before logging in. Check your inbox for the verification link.',
+            }, status=status.HTTP_403_FORBIDDEN)
  
         # Check Anki setup status
         anki_status = check_anki_setup(user)
@@ -183,6 +226,136 @@ class LogoutView(APIView):
         })
 
 
+class VerifyCodeView(View):
+    """
+    POST /web/accounts/verify-code/
+    Verify user's email address using the 6-digit code.
+    """
+    
+    def post(self, request):
+        verification_code = request.POST.get('verification_code', '').strip()
+        user_id = request.session.get('pending_verification_user_id')
+        
+        if not user_id:
+            messages.error(request, 'No pending verification found. Please register again.')
+            return redirect('accounts-web:register')
+        
+        if not verification_code or len(verification_code) != 6:
+            messages.error(request, 'Please enter a valid 6-digit verification code.')
+            languages = Language.objects.all().order_by('name')
+            return render(request, 'accounts/register.html', {
+                'languages': languages,
+                'show_verification': True,
+                'user_email': request.session.get('pending_verification_email'),
+            })
+        
+        try:
+            user = User.objects.get(id=user_id)
+            
+            # Check if already verified
+            if user.email_verified:
+                messages.info(request, 'Your email is already verified. You can log in now.')
+                # Clear session
+                request.session.pop('pending_verification_user_id', None)
+                request.session.pop('pending_verification_email', None)
+                return redirect('accounts-web:login')
+            
+            # Verify code
+            if user.is_verification_code_valid(verification_code):
+                user.email_verified = True
+                user.verification_code = None  # Clear the code after successful verification
+                user.save(update_fields=['email_verified', 'verification_code'])
+                
+                # Clear session
+                request.session.pop('pending_verification_user_id', None)
+                request.session.pop('pending_verification_email', None)
+                
+                messages.success(request, 'Email verified successfully! You can now log in.')
+                return redirect('accounts-web:login')
+            else:
+                messages.error(request, 'Invalid or expired verification code. Please try again or request a new code.')
+                languages = Language.objects.all().order_by('name')
+                return render(request, 'accounts/register.html', {
+                    'languages': languages,
+                    'show_verification': True,
+                    'user_email': user.email,
+                })
+            
+        except User.DoesNotExist:
+            messages.error(request, 'User not found. Please register again.')
+            request.session.pop('pending_verification_user_id', None)
+            request.session.pop('pending_verification_email', None)
+            return redirect('accounts-web:register')
+
+
+class ResendCodeView(View):
+    """
+    POST /web/accounts/resend-code/
+    Resend verification code to user.
+    """
+    
+    def post(self, request):
+        user_id = request.session.get('pending_verification_user_id')
+        
+        if not user_id:
+            messages.error(request, 'No pending verification found. Please register again.')
+            return redirect('accounts-web:register')
+        
+        try:
+            user = User.objects.get(id=user_id)
+            
+            # Check if already verified
+            if user.email_verified:
+                messages.info(request, 'Your email is already verified. You can log in now.')
+                request.session.pop('pending_verification_user_id', None)
+                request.session.pop('pending_verification_email', None)
+                return redirect('accounts-web:login')
+            
+            # Generate new verification code
+            verification_code = user.generate_verification_code()
+            
+            # Send verification email
+            email_html = render_to_string('accounts/verification_email.html', {
+                'user': user,
+                'verification_code': verification_code,
+            })
+            email_text = render_to_string('accounts/verification_email.txt', {
+                'user': user,
+                'verification_code': verification_code,
+            })
+            
+            send_mail(
+                subject='Anki Vocabulary Builder Email Verification Code',
+                message=email_text,
+                html_message=email_html,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[user.email],
+                fail_silently=False,
+            )
+            
+            messages.success(request, 'A new verification code has been sent to your email. Please check your inbox.')
+            languages = Language.objects.all().order_by('name')
+            return render(request, 'accounts/register.html', {
+                'languages': languages,
+                'show_verification': True,
+                'user_email': user.email,
+            })
+            
+        except User.DoesNotExist:
+            messages.error(request, 'User not found. Please register again.')
+            request.session.pop('pending_verification_user_id', None)
+            request.session.pop('pending_verification_email', None)
+            return redirect('accounts-web:register')
+        except Exception as e:
+            messages.error(request, 'Failed to send verification code. Please try again later.')
+            languages = Language.objects.all().order_by('name')
+            return render(request, 'accounts/register.html', {
+                'languages': languages,
+                'show_verification': True,
+                'user_email': request.session.get('pending_verification_email'),
+            })
+
+
 class WebLoginView(View):
     """
     Web login view that checks Anki status before allowing login.
@@ -209,6 +382,11 @@ class WebLoginView(View):
             messages.error(request, 'Invalid username or password.')
             return render(request, 'accounts/login.html')
         
+        # Check if email is verified
+        if not user.email_verified:
+            messages.error(request, 'Please verify your email address before logging in. Check your inbox for the verification link.')
+            return render(request, 'accounts/login.html')
+        
         # Check Anki setup status
         anki_status = check_anki_setup(user, save_status=True)
         
@@ -224,10 +402,21 @@ class WebLoginView(View):
         messages.success(request, f'Welcome back, {user.username}!')
         
         # Redirect to next page or home
-        next_url = request.GET.get('next', '/')
+        next_url = request.GET.get('next', '/cards/batches/create/')
         return redirect(next_url)
- 
- 
+
+
+class WebLogoutView(View):
+    """
+    GET /accounts/logout/
+    Logs the user out.
+    """
+    def get(self, request):
+        django_logout(request)
+        messages.success(request, "You have been successfully logged out.")
+        return redirect('accounts-web:login')
+
+
 class ProfileView(APIView):
     """
     GET  /api/v1/auth/profile/    → Get profile

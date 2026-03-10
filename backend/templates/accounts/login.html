@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 
-{% block title %}Login — Anki Vocab Builder{% endblock %}
+{% block title %}Login — Anki Vocabulary Builder{% endblock %}
 
 {% block content %}
 <div class="row justify-content-center">
@@ -8,6 +8,48 @@
     <div class="card mt-5">
       <div class="card-body">
         <h3 class="card-title mb-4">Login</h3>
+        
+        <!-- Anki Connection Status Warning - Visual Guide -->
+        <div id="anki-status-warning" class="alert alert-primary border-primary d-none shadow mb-3" role="alert" style="animation: pulse 2s infinite; background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); border-color: #1e3c72 !important;">
+          <div class="text-center mb-2">
+            <h6 class="alert-heading mb-1">
+              <i class="bi bi-exclamation-triangle-fill"></i>
+              <strong>Anki Not Connected</strong>
+            </h6>
+            <p class="mb-0 small">For full functionality, ensure Anki is running</p>
+          </div>
+          
+          <!-- Compact Visual Flow -->
+          <div class="anki-quick-fix">
+            <div class="fix-step">
+              <div class="fix-number">1</div>
+              <div class="fix-icon"><i class="bi bi-laptop"></i></div>
+              <div class="fix-label">Open Anki</div>
+            </div>
+            
+            <div class="fix-arrow"><i class="bi bi-chevron-right"></i></div>
+            
+            <div class="fix-step">
+              <div class="fix-number">2</div>
+              <div class="fix-icon"><i class="bi bi-puzzle"></i></div>
+              <div class="fix-label">AnkiConnect<br><small>2055492159</small></div>
+            </div>
+            
+            <div class="fix-arrow"><i class="bi bi-chevron-right"></i></div>
+            
+            <div class="fix-step">
+              <div class="fix-number">3</div>
+              <div class="fix-icon"><i class="bi bi-check-circle"></i></div>
+              <div class="fix-label">Check</div>
+            </div>
+          </div>
+          
+          <div class="text-center mt-2">
+            <button type="button" class="btn btn-warning btn-sm" onclick="checkAnkiConnection()">
+              <i class="bi bi-arrow-clockwise"></i> Check Connection
+            </button>
+          </div>
+        </div>
         
         <form method="post" action="{% url 'accounts-web:login' %}">
           {% csrf_token %}
@@ -28,4 +70,154 @@
     </div>
   </div>
 </div>
+
+<style>
+  @keyframes pulse {
+    0%, 100% {
+      border-width: 2px;
+      box-shadow: 0 0 0 0 rgba(30, 60, 114, 0.4);
+    }
+    50% {
+      border-width: 3px;
+      box-shadow: 0 0 20px 5px rgba(42, 82, 152, 0.3);
+    }
+  }
+  
+  @keyframes slideIn {
+    from { opacity: 0; transform: scale(0.9); }
+    to { opacity: 1; transform: scale(1); }
+  }
+  
+  @keyframes bounce {
+    0%, 100% { transform: translateX(0); }
+    50% { transform: translateX(3px); }
+  }
+  
+  #anki-status-warning {
+    border-width: 2px !important;
+  }
+  
+  .anki-quick-fix {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0.5rem 0;
+    flex-wrap: wrap;
+  }
+  
+  .fix-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.3rem;
+    background: rgba(255, 255, 255, 0.15);
+    padding: 0.5rem;
+    border-radius: 8px;
+    min-width: 80px;
+    animation: slideIn 0.4s ease-out;
+    transition: transform 0.3s ease;
+  }
+  
+  .fix-step:hover {
+    transform: translateY(-2px);
+  }
+  
+  .fix-step:nth-child(1) { animation-delay: 0s; }
+  .fix-step:nth-child(3) { animation-delay: 0.1s; }
+  .fix-step:nth-child(5) { animation-delay: 0.2s; }
+  
+  .fix-number {
+    background: #ffc107;
+    color: #000;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 0.75rem;
+  }
+  
+  .fix-icon {
+    font-size: 1.3rem;
+    color: #ffffff;
+  }
+  
+  .fix-label {
+    color: #ffffff;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-align: center;
+    line-height: 1.1;
+  }
+  
+  .fix-label small {
+    display: block;
+    font-size: 0.65rem;
+    color: #ffc107;
+    font-weight: bold;
+    margin-top: 0.15rem;
+  }
+  
+  .fix-arrow {
+    color: #ffc107;
+    font-size: 1.2rem;
+    animation: bounce 1.5s ease-in-out infinite;
+  }
+  
+  @media (max-width: 576px) {
+    .anki-quick-fix {
+      flex-direction: column;
+    }
+    
+    .fix-arrow {
+      transform: rotate(90deg);
+    }
+  }
+</style>
+
+<script>
+  // Check Anki connection on page load
+  document.addEventListener('DOMContentLoaded', function() {
+    checkAnkiConnection();
+  });
+
+  async function checkAnkiConnection() {
+    const warningDiv = document.getElementById('anki-status-warning');
+    
+    try {
+      const response = await fetch('http://localhost:8765', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'version', version: 6 })
+      });
+      
+      if (!response.ok) {
+        showAnkiWarning();
+      } else {
+        const data = await response.json();
+        if (!data.result) {
+          showAnkiWarning();
+        } else {
+          // Connection successful - hide warning
+          if (warningDiv) {
+            warningDiv.classList.add('d-none');
+          }
+        }
+      }
+    } catch (error) {
+      showAnkiWarning();
+    }
+  }
+
+  function showAnkiWarning() {
+    const warningDiv = document.getElementById('anki-status-warning');
+    if (warningDiv) {
+      warningDiv.classList.remove('d-none');
+    }
+  }
+</script>
+
 {% endblock %}

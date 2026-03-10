@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════
-   Anki Vocab Builder — Shared JavaScript Utilities
+   Anki Vocabulary Builder — Shared JavaScript Utilities
    ═══════════════════════════════════════════════════
 
    This file contains utility functions used across
@@ -566,10 +566,155 @@ function enableDirtyFormWarning(formId) {
 // ═══════════════════════════════════════════════════
 
 console.log(
-    '%c🎴 Anki Vocab Builder',
+    '%c🎴 Anki Vocabulary Builder',
     'font-size: 20px; font-weight: bold; color: #0d6efd;'
 );
 console.log(
     '%cBuild vocabulary flashcards with AI-powered translations and Azure TTS.',
     'font-size: 12px; color: #6c757d;'
 );
+
+function pollBatchStatus(batchId) {
+    const interval = setInterval(async () => {
+        try {
+            const response = await apiRequest(`/api/v1/cards/batches/${batchId}/`);
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            const batch = await response.json();
+
+            // Update progress bar
+            const progress = batch.summary.pushed + batch.summary.failed;
+            const total = batch.summary.total;
+            const percentage = total > 0 ? (progress / total) * 100 : 0;
+            
+            const progressBar = document.getElementById('progress-bar');
+            const progressText = document.getElementById('progress-text');
+            if (progressBar && progressText) {
+                progressBar.style.width = `${percentage}%`;
+                progressBar.setAttribute('aria-valuenow', percentage);
+                progressText.textContent = `Processing: ${progress} / ${total}`;
+            }
+
+            // Check if batch is complete
+            if (batch.status === 'completed' || batch.status === 'partial_failure' || batch.status === 'failed') {
+                clearInterval(interval);
+                setButtonLoading(document.getElementById('submit-batch-btn'), false);
+                
+                // Show completion modal
+                showCompletionModal(batch);
+
+                // Send OS-level desktop notification
+                if ('Notification' in window && Notification.permission === 'granted') {
+                    var title = batch.status === 'completed' ? '\u2705 Batch Complete' : '\u26A0\uFE0F Batch Finished';
+                    var body = batch.status === 'completed'
+                        ? 'All ' + batch.summary.total + ' cards pushed to Anki!'
+                        : batch.summary.pushed + '/' + batch.summary.total + ' pushed, ' + batch.summary.failed + ' failed.';
+                    if (typeof sendDesktopNotification === 'function') {
+                        sendDesktopNotification(title, body);
+                    } else {
+                        try { new Notification(title, { body: body, tag: 'batch-' + Date.now(), requireInteraction: true }); } catch(e) {}
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Error polling batch status:', error);
+            clearInterval(interval);
+            setButtonLoading(document.getElementById('submit-batch-btn'), false);
+            const batchMessage = document.getElementById('batch-message');
+            batchMessage.className = 'alert alert-danger';
+            batchMessage.textContent = 'Error checking batch status. Please check the batch list for details.';
+            batchMessage.classList.remove('d-none');
+        }
+    }, 2000); // Poll every 2 seconds
+}
+
+function showCompletionModal(batch) {
+    const modal = new bootstrap.Modal(document.getElementById('batchCompleteModal'));
+    const modalHeader = document.getElementById('modal-header');
+    const modalBody = document.getElementById('modal-body');
+    const viewBatchBtn = document.getElementById('view-batch-btn');
+
+    viewBatchBtn.href = `/cards/batches/${batch.id}/`;
+
+    if (batch.status === 'completed') {
+        modalHeader.className = 'modal-header bg-success text-white';
+        modalBody.innerHTML = `
+            <div class="text-center">
+                <i class="bi bi-check-circle-fill text-success" style="font-size: 3rem;"></i>
+                <h4 class="mt-3">Batch Completed Successfully!</h4>
+                <p>All <strong>${batch.summary.total}</strong> cards were processed and pushed to Anki.</p>
+            </div>
+        `;
+    } else { // partial_failure or failed
+        modalHeader.className = 'modal-header bg-danger text-white';
+
+        // Build per-card error detail with staggered animations
+        let cardErrors = '';
+        if (batch.cards && batch.cards.length > 0) {
+            let failedCards = batch.cards.filter(c => c.status === 'failed');
+            if (failedCards.length > 0) {
+                cardErrors = '<div class="mt-3 animate-fade-in"><strong><i class="bi bi-exclamation-diamond"></i> Failed cards:</strong></div><ul class="list-group mt-2">';
+                failedCards.forEach((c, idx) => {
+                    cardErrors += `<li class="list-group-item list-group-item-danger animate-slide-in" style="animation-delay: ${0.15 * (idx + 1)}s;">
+                        <div class="d-flex align-items-start">
+                            <i class="bi bi-x-octagon-fill text-danger me-2 mt-1 animate-shake"></i>
+                            <div>
+                                <strong>${escapeHtml(c.input_text)}</strong>
+                                <br><small class="text-muted"><i class="bi bi-arrow-return-right"></i> ${escapeHtml(c.error_message || 'Unknown error')}</small>
+                            </div>
+                        </div>
+                    </li>`;
+                });
+                cardErrors += '</ul>';
+            }
+        }
+
+        let errorMessage = `
+            <style>
+                @keyframes modalShake { 0%,100%{transform:translateX(0)} 15%{transform:translateX(-8px)} 30%{transform:translateX(8px)} 45%{transform:translateX(-5px)} 60%{transform:translateX(5px)} 75%{transform:translateX(-2px)} 90%{transform:translateX(2px)} }
+                @keyframes fadeIn { from{opacity:0;transform:translateY(-10px)} to{opacity:1;transform:translateY(0)} }
+                @keyframes slideIn { from{opacity:0;transform:translateX(-20px)} to{opacity:1;transform:translateX(0)} }
+                @keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.15)} }
+                @keyframes shake { 0%,100%{transform:rotate(0)} 25%{transform:rotate(-10deg)} 75%{transform:rotate(10deg)} }
+                .animate-modal-shake { animation: modalShake 0.5s ease-in-out; }
+                .animate-fade-in { animation: fadeIn 0.4s ease-out both; }
+                .animate-slide-in { animation: slideIn 0.4s ease-out both; }
+                .animate-pulse { animation: pulse 1.5s ease-in-out infinite; }
+                .animate-shake { animation: shake 0.4s ease-in-out 0.5s both; }
+                .error-icon-big { font-size: 3.5rem; }
+                .summary-item { transition: background-color 0.3s ease; }
+                .summary-item:hover { background-color: #f8f9fa; }
+            </style>
+            <div class="text-center animate-modal-shake">
+                <i class="bi bi-x-circle-fill text-danger error-icon-big animate-pulse"></i>
+                <h4 class="mt-3 animate-fade-in">Batch Processing Issues</h4>
+            </div>
+            <ul class="list-group mt-3">
+                <li class="list-group-item d-flex justify-content-between align-items-center summary-item animate-slide-in" style="animation-delay:0.1s;">
+                    <span><i class="bi bi-check-circle text-success"></i> Successfully pushed:</span>
+                    <span class="badge bg-success rounded-pill">${batch.summary.pushed}</span>
+                </li>
+                <li class="list-group-item d-flex justify-content-between align-items-center summary-item animate-slide-in" style="animation-delay:0.2s;">
+                    <span><i class="bi bi-x-circle text-danger"></i> Failed:</span>
+                    <span class="badge bg-danger rounded-pill">${batch.summary.failed}</span>
+                </li>
+                <li class="list-group-item d-flex justify-content-between align-items-center summary-item animate-slide-in" style="animation-delay:0.3s;">
+                    <span><i class="bi bi-collection text-secondary"></i> Total:</span>
+                    <span class="badge bg-secondary rounded-pill">${batch.summary.total}</span>
+                </li>
+            </ul>
+            ${cardErrors}
+        `;
+        modalBody.innerHTML = errorMessage;
+    }
+
+    modal.show();
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    var vocabInput = document.getElementById('vocabulary-input');
+    if (vocabInput) {
+        autoResizeTextarea(vocabInput, 200, 600);
+    }
+});

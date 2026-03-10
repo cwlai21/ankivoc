@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verify Your Email</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            background-color: #f8f9fa;
+            border-radius: 10px;
+            padding: 30px;
+            margin: 20px 0;
+        }
+        .header {
+            text-align: center;
+            color: #0d6efd;
+            margin-bottom: 20px;
+        }
+        .code-box {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            font-size: 32px;
+            font-weight: bold;
+            letter-spacing: 8px;
+            text-align: center;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 30px 0;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .footer {
+            margin-top: 30px;
+            font-size: 0.9em;
+            color: #6c757d;
+            border-top: 1px solid #dee2e6;
+            padding-top: 20px;
+        }
+        .note {
+            background-color: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 10px 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        .expiry {
+            text-align: center;
+            color: #dc3545;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="header">Welcome to Anki Vocabulary Builder! 🎉</h1>
+        
+        <p>Hi <strong>{{ user.username }}</strong>,</p>
+        
+        <p>Thank you for registering with Anki Vocabulary Builder. To complete your registration and start creating vocabulary cards, please enter this verification code on the registration page:</p>
+        
+        <div class="code-box">
+            {{ verification_code }}
+        </div>
+        
+        <p class="expiry">⏰ This code expires in 15 minutes</p>
+        
+        <div class="note">
+            <strong>Note:</strong> If you didn't create an account with Anki Vocabulary Builder, you can safely ignore this email.
+        </div>
+        
+        <p>If you didn't receive this code or it has expired, you can request a new one from the registration page.</p>
+        
+        <div class="footer">
+            <p>Best regards,<br>The Anki Vocabulary Builder Team</p>
+            <p>Need help? Contact us at support@ankivocab.com</p>
+        </div>
+    </div>
+</body>
+</html>

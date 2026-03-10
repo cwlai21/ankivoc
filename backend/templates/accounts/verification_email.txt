@@ -1,0 +1,18 @@
+Welcome to Anki Vocabulary Builder!
+
+Hi {{ user.username }},
+
+Thank you for registering with Anki Vocabulary Builder. To complete your registration and start creating vocabulary cards, please enter this verification code on the registration page:
+
+VERIFICATION CODE: {{ verification_code }}
+
+This code expires in 15 minutes.
+
+If you didn't receive this code or it has expired, you can request a new one from the registration page.
+
+If you didn't create an account with Anki Vocabulary Builder, you can safely ignore this email.
+
+Best regards,
+The Anki Vocabulary Builder Team
+
+Need help? Contact us at support@ankivocab.com

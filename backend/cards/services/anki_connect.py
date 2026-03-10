@@ -60,15 +60,18 @@ class AnkiConnectClient:
             response.raise_for_status()
         except requests.ConnectionError:
             raise AnkiConnectError(
-                f'Cannot connect to AnkiConnect at {self.url}. '
-                f'Is Anki running with AnkiConnect add-on installed?'
+                '🔌 Cannot connect to AnkiConnect! '
+                'Please ensure: (1) Anki Desktop is RUNNING, '
+                '(2) AnkiConnect add-on is installed (code: 2055492159). '
+                'Install via Tools → Add-ons → Get Add-ons in Anki.'
             )
         except requests.Timeout:
             raise AnkiConnectError(
-                f'AnkiConnect request timed out at {self.url}.'
+                '⏱️ AnkiConnect request timed out. '
+                'Anki may be busy or not responding. Please check Anki Desktop.'
             )
         except requests.RequestException as e:
-            raise AnkiConnectError(f'AnkiConnect request failed: {e}')
+            raise AnkiConnectError(f'❌ AnkiConnect request failed: {e}')
 
         result = response.json()
 
@@ -104,7 +107,7 @@ class AnkiConnectClient:
                 'anki_running': True,
                 'ankiconnect_installed': True,
                 'version': version,
-                'message': f'AnkiConnect v{version} is ready'
+                'message': f'✅ Connected! AnkiConnect v{version} is ready'
             }
         except AnkiConnectError as e:
             error_msg = str(e).lower()
@@ -113,21 +116,37 @@ class AnkiConnectClient:
                     'anki_running': False,
                     'ankiconnect_installed': None,  # Cannot determine if Anki is not running
                     'version': None,
-                    'message': 'Cannot connect to AnkiConnect. Please ensure: (1) Anki is running, (2) AnkiConnect add-on is installed and enabled (Tools → Add-ons).'
+                    'message': (
+                        '❌ Cannot connect to Anki Desktop!\n\n'
+                        'Required Steps:\n'
+                        '1️⃣ Open Anki Desktop application\n'
+                        '2️⃣ Install AnkiConnect add-on:\n'
+                        '   • In Anki: Tools → Add-ons → Get Add-ons\n'
+                        '   • Enter code: 2055492159\n'
+                        '   • Restart Anki after installation\n'
+                        '3️⃣ Try again after completing steps above'
+                    )
                 }
             else:
                 return {
                     'anki_running': True,
                     'ankiconnect_installed': False,
                     'version': None,
-                    'message': 'AnkiConnect add-on may not be installed. Please install AnkiConnect.'
+                    'message': (
+                        '⚠️ Anki is running but AnkiConnect add-on not found!\n\n'
+                        'Install Steps:\n'
+                        '1️⃣ In Anki: Tools → Add-ons → Get Add-ons\n'
+                        '2️⃣ Enter code: 2055492159\n'
+                        '3️⃣ Click OK and restart Anki\n'
+                        '4️⃣ Try again after Anki restarts'
+                    )
                 }
         except Exception as e:
             return {
                 'anki_running': False,
                 'ankiconnect_installed': None,
                 'version': None,
-                'message': f'Unexpected error checking Anki status: {str(e)}'
+                'message': f'❌ Unexpected error checking Anki status: {str(e)}'
             }
 
     def get_addons_list(self):
@@ -197,11 +216,12 @@ class AnkiConnectClient:
         """
         existing = self.get_model_names()
         if model_name in existing:
-            # Model exists - check if all fields are present
+            # Model exists - check if all fields are present (case-insensitive)
             try:
                 existing_fields = self._invoke('modelFieldNames', modelName=model_name)
                 if existing_fields:
-                    missing_fields = [f for f in in_order_fields if f not in existing_fields]
+                    existing_lower = {f.lower() for f in existing_fields}
+                    missing_fields = [f for f in in_order_fields if f.lower() not in existing_lower]
                     if missing_fields:
                         logger.info(f'Adding missing fields to model {model_name}: {missing_fields}')
                         for field in missing_fields:
@@ -549,11 +569,14 @@ hr#answer {
             logger.warning(f'Model "{model_name}" not present in Anki; falling back to "Français-(R/L)"')
             model_name = 'Français-(R/L)'
 
-        # Ensure all template-defined fields exist in the fields dict
-        # If card_template is provided, add missing fields as empty strings
+        # Ensure all template-defined fields exist in the fields dict.
+        # Use case-insensitive comparison to avoid adding duplicate keys
+        # (e.g. 'exemple-FR' when 'Exemple-FR' already exists) which would
+        # cause AnkiConnect to overwrite populated fields with empty values.
         if card_template and hasattr(card_template, 'fields_definition') and card_template.fields_definition:
+            existing_lower = {k.lower() for k in fields}
             for field_name in card_template.fields_definition:
-                if field_name not in fields:
+                if field_name.lower() not in existing_lower:
                     fields[field_name] = ''
                     logger.debug(f'Added missing field "{field_name}" with empty value')
 
