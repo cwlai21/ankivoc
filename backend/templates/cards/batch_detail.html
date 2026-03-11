@@ -276,6 +276,25 @@
 
   </div>
 </div>
+
+<!-- Modal for Batch Completion -->
+<div class="modal fade" id="batchCompleteModal" tabindex="-1" aria-labelledby="batchCompleteModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header" id="modal-header">
+        <h5 class="modal-title" id="batchCompleteModalLabel">Batch Processing Complete</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="modal-body">
+        ...
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <a href="#" id="view-batch-btn" class="btn btn-primary">View Batch</a>
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
@@ -283,6 +302,55 @@
 // ═══════════════════════════════════════════════════
 // State
 // ═══════════════════════════════════════════════════
+
+var _swRegistration = null;
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw-notif.js').then(function(reg) {
+        _swRegistration = reg;
+        console.log('[Notif] Service worker registered');
+    }).catch(function(err) {
+        console.warn('[Notif] SW registration failed:', err);
+    });
+}
+
+function sendDesktopNotification(title, body) {
+    console.log('[Notif] sendDesktopNotification called:', title, body);
+    if (!('Notification' in window) || Notification.permission !== 'granted') {
+        console.log('[Notif] Skipping — not granted');
+        return;
+    }
+    // Prefer service worker showNotification (reliable on macOS Chrome)
+    if (_swRegistration) {
+        _swRegistration.showNotification(title, {
+            body: body,
+            tag: 'batch-' + Date.now(),
+            requireInteraction: true,
+            icon: '/static/img/favicon.png',
+        }).then(function() {
+            console.log('[Notif] SW notification shown');
+        }).catch(function(err) {
+            console.warn('[Notif] SW notification failed, falling back:', err);
+            _fallbackNotification(title, body);
+        });
+    } else {
+        // Fallback: try constructor directly
+        _fallbackNotification(title, body);
+    }
+}
+
+function _fallbackNotification(title, body) {
+    try {
+        var n = new Notification(title, {
+            body: body,
+            tag: 'batch-' + Date.now(),
+            requireInteraction: true,
+        });
+        n.onclick = function() { window.focus(); n.close(); };
+        console.log('[Notif] Fallback notification created');
+    } catch (e) {
+        console.error('[Notif] Fallback notification failed:', e);
+    }
+}
 
 var batchId = null;
 
@@ -424,8 +492,12 @@ async function loadBatchDetail() {
 
     // Show retry button if there are failed cards
     var summary = data.summary || {};
+    var retryBtn = document.getElementById('retry-btn');
     if (summary.failed > 0) {
-      document.getElementById('retry-btn').classList.remove('d-none');
+      retryBtn.classList.remove('d-none');
+      retryBtn.innerHTML = `<i class="bi bi-arrow-repeat"></i> Retry ${summary.failed} Failed Card(s)`;
+    } else if (retryBtn) {
+      retryBtn.classList.add('d-none');
     }
 
   } catch (e) {
@@ -663,12 +735,21 @@ function retryFailed() {
             retryBtn.classList.remove('disabled');
             retryBtn.removeAttribute('aria-disabled');
           }
-          if (summary.failed === 0) {
-            showDetailMessage('success', 'Retry completed — no failed cards remain.');
-          } else if (d.status === 'partial_failure') {
-            showDetailMessage('warning', 'Retry finished with partial failures.');
-          } else if (attempts >= maxAttempts) {
+          if (attempts >= maxAttempts) {
             showDetailMessage('info', 'Retry still in progress; refresh the page to continue monitoring.');
+          } else {
+            showCompletionModal(d);
+            if (d.summary.failed === 0) {
+                sendDesktopNotification(
+                    '\u2705 Retry Complete',
+                    'All ' + d.summary.total + ' cards are now successfully pushed to Anki!'
+                );
+            } else {
+                sendDesktopNotification(
+                    '\u26A0\uFE0F Retry Finished',
+                    d.summary.pushed + '/' + d.summary.total + ' pushed, ' + d.summary.failed + ' failed.'
+                );
+            }
           }
         }
       } catch (err) {

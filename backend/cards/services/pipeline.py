@@ -799,6 +799,7 @@ else if (word.includes('\uc744') || word.includes('\ub97c')){{ // 을/를
                     )
 
                     conjugaison_lower = conjugaison_genre.lower()
+                    is_adjectif = 'adjectif' in conjugaison_lower
                     is_masculin = 'masculin' in conjugaison_lower or 'masculine' in conjugaison_lower or 'm.' in conjugaison_lower
                     is_feminin = 'feminin' in conjugaison_lower or 'féminin' in conjugaison_lower or 'feminine' in conjugaison_lower or 'f.' in conjugaison_lower
                     
@@ -826,18 +827,19 @@ else if (word.includes('\uc744') || word.includes('\ub97c')){{ // 을/를
                     original_is_plural = target_word.lower().startswith(('des ', 'les '))
 
                     article = ''
-                    if is_plural and not original_is_plural:
-                        article = 'des'
-                    elif is_masculin:
-                        if starts_with_vowel:
-                            article = "de l'"
-                        else:
-                            article = 'du'
-                    elif is_feminin:
-                        if starts_with_vowel:
-                            article = "de l'"
-                        else:
-                            article = 'de la'
+                    if not is_adjectif:
+                        if is_plural and not original_is_plural:
+                            article = 'des'
+                        elif is_masculin:
+                            if starts_with_vowel:
+                                article = "de l'"
+                            else:
+                                article = 'du'
+                        elif is_feminin:
+                            if starts_with_vowel:
+                                article = "de l'"
+                            else:
+                                article = 'de la'
 
                     final_text = f"{article} {front}".strip() if article else front
 

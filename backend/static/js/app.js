@@ -630,6 +630,19 @@ function pollBatchStatus(batchId) {
 }
 
 function showCompletionModal(batch) {
+    const vocabInput = document.getElementById('vocabulary-input');
+    if (vocabInput) {
+        vocabInput.value = '';
+        const countSpan = document.getElementById('word-count');
+        if (countSpan) {
+            countSpan.textContent = '0 words';
+            countSpan.className = 'text-muted';
+        }
+        const submitBtn = document.getElementById('submit-batch-btn');
+        if (submitBtn) {
+            submitBtn.disabled = true;
+        }
+    }
     const modal = new bootstrap.Modal(document.getElementById('batchCompleteModal'));
     const modalHeader = document.getElementById('modal-header');
     const modalBody = document.getElementById('modal-body');
