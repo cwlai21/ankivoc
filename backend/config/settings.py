@@ -30,7 +30,7 @@ DEBUG = os.getenv('DEBUG', 'True').lower() == 'true'
 ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-# DEBUG and ALLOWED_HOSTS are set from environment variables above.
+# DEBUG and ALLOWED_HOSTS are controlled by environment variables above.
 
 
 # Application definition
@@ -147,7 +147,7 @@ USE_TZ = True
 # Prefer leading and trailing slashes (Django will join when needed).
 STATIC_URL = '/static/'
 
-# Where collectstatic puts files in production (served by Nginx)
+# Where collectstatic puts files in production (served by Nginx/whitenoise)
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 # Additional static files directories for development. Ensures

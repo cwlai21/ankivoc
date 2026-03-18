@@ -1,7 +1,1 @@
-aiohttp
-python-dotenv
-requests
-openai
-aiofiles
-tqdm
-pytest
+-r backend/requirements.txt
