@@ -1,11 +1,22 @@
 /__pycache__/
+**/__pycache__/
 /.venv/
 .python-version
 .env*
-*.json
 test.py
 anki_voc_*.csv
 media/
 tools/
 scripts/
 *.log
+*.sqlite3
+staticfiles/
+
+# Secrets & generated files
+credential.json
+audio_cache.json
+cookies.txt
+*.csv
+
+# IDE
+.vscode/

@@ -30,9 +30,7 @@ DEBUG = os.getenv('DEBUG', 'True').lower() == 'true'
 ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
-
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', 'testserver']
+# DEBUG and ALLOWED_HOSTS are set from environment variables above.
 
 
 # Application definition
@@ -96,12 +94,19 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+DATABASE_URL = os.getenv('DATABASE_URL')
+if DATABASE_URL:
+    import dj_database_url
+    DATABASES = {
+        'default': dj_database_url.parse(DATABASE_URL, conn_max_age=600)
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
 
 
 # Password validation
@@ -141,6 +146,9 @@ USE_TZ = True
 # URL to use when referring to static files located in STATIC_ROOT.
 # Prefer leading and trailing slashes (Django will join when needed).
 STATIC_URL = '/static/'
+
+# Where collectstatic puts files in production (served by Nginx)
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 # Additional static files directories for development. Ensures
 # project-level `static/` (e.g. backend/static) is found by
