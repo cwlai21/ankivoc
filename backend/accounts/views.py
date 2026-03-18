@@ -65,47 +65,42 @@ class RegisterView(APIView):
             else:
                 return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         
-        # Create temporary client with default settings to check Anki first
-        temp_client = AnkiConnectClient()
-        anki_status_dict = temp_client.check_anki_status()
-        
-        # Build full response with download info if needed
-        anki_status = {
-            'anki_ready': anki_status_dict['anki_running'] and anki_status_dict['ankiconnect_installed'],
-            'anki_running': anki_status_dict['anki_running'],
-            'ankiconnect_installed': anki_status_dict['ankiconnect_installed'],
-            'version': anki_status_dict['version'],
-            'message': anki_status_dict['message']
-        }
-        
-        # Add download URL if AnkiConnect needs to be installed
-        if not anki_status_dict['ankiconnect_installed'] and anki_status_dict['ankiconnect_installed'] is not None:
-            anki_status['download_url'] = '/api/v1/auth/download-ankiconnect/'
-            anki_status['ankiweb_url'] = 'https://ankiweb.net/shared/info/2055492159'
-        
-        # If Anki is not ready, return error WITHOUT creating user
-        if not anki_status['anki_ready']:
-            if is_html_form:
-                messages.error(request, anki_status['message'])
-                languages = Language.objects.all().order_by('name')
-                return render(request, 'accounts/register.html', {
-                    'languages': languages,
-                    'form': request.data,
-                })
-            else:
-                return Response({
-                    'error': 'Anki setup required',
-                    'message': anki_status['message'],
-                    'anki_status': anki_status,
-                }, status=status.HTTP_424_FAILED_DEPENDENCY)
-        
-        # Anki is ready - proceed with user creation
+        # Anki runs on the user's local machine — skip server-side check in production
+        if settings.DEBUG:
+            temp_client = AnkiConnectClient()
+            anki_status_dict = temp_client.check_anki_status()
+            anki_status = {
+                'anki_ready': anki_status_dict['anki_running'] and anki_status_dict['ankiconnect_installed'],
+                'anki_running': anki_status_dict['anki_running'],
+                'ankiconnect_installed': anki_status_dict['ankiconnect_installed'],
+                'version': anki_status_dict['version'],
+                'message': anki_status_dict['message']
+            }
+            if not anki_status_dict['ankiconnect_installed'] and anki_status_dict['ankiconnect_installed'] is not None:
+                anki_status['download_url'] = '/api/v1/auth/download-ankiconnect/'
+                anki_status['ankiweb_url'] = 'https://ankiweb.net/shared/info/2055492159'
+            if not anki_status['anki_ready']:
+                if is_html_form:
+                    messages.error(request, anki_status['message'])
+                    languages = Language.objects.all().order_by('name')
+                    return render(request, 'accounts/register.html', {
+                        'languages': languages,
+                        'form': request.data,
+                    })
+                else:
+                    return Response({
+                        'error': 'Anki setup required',
+                        'message': anki_status['message'],
+                        'anki_status': anki_status,
+                    }, status=status.HTTP_424_FAILED_DEPENDENCY)
+        else:
+            anki_status = {'anki_ready': True, 'version': None}
+
+        # Proceed with user creation
         user = serializer.save()
-        
-        # Update user Anki status
         user.anki_last_checked = timezone.now()
         user.anki_setup_completed = True
-        user.ankiconnect_version = anki_status['version']
+        user.ankiconnect_version = anki_status.get('version')
         user.save(update_fields=['anki_last_checked', 'anki_setup_completed', 'ankiconnect_version'])
         
         # Generate verification code
@@ -387,17 +382,16 @@ class WebLoginView(View):
             messages.error(request, 'Please verify your email address before logging in. Check your inbox for the verification link.')
             return render(request, 'accounts/login.html')
         
-        # Check Anki setup status
-        anki_status = check_anki_setup(user, save_status=True)
-        
-        # If Anki is not ready, block login and show error
-        if not anki_status['anki_ready']:
-            messages.error(request, anki_status['message'])
-            if 'download_url' in anki_status:
-                messages.info(request, f'Need to install AnkiConnect? Use add-on code: 2055492159')
-            return render(request, 'accounts/login.html')
-        
-        # Anki is ready - proceed with login
+        # Anki runs on the user's local machine — skip server-side check in production
+        if settings.DEBUG:
+            anki_status = check_anki_setup(user, save_status=True)
+            if not anki_status['anki_ready']:
+                messages.error(request, anki_status['message'])
+                if 'download_url' in anki_status:
+                    messages.info(request, f'Need to install AnkiConnect? Use add-on code: 2055492159')
+                return render(request, 'accounts/login.html')
+
+        # Proceed with login
         django_login(request, user)
         messages.success(request, f'Welcome back, {user.username}!')
         

@@ -32,6 +32,15 @@ ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 # SECURITY WARNING: don't run with debug turned on in production!
 # DEBUG and ALLOWED_HOSTS are controlled by environment variables above.
 
+# Trust HTTPS requests from Railway (and any custom domain) for CSRF
+CSRF_TRUSTED_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv('CSRF_TRUSTED_ORIGINS', 'http://localhost:8000').split(',')
+]
+
+# Trust the X-Forwarded-Proto header set by Railway's proxy
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
 
 # Application definition
 
