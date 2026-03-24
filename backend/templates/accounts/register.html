@@ -382,30 +382,62 @@
 <script>
   // Check Anki status on page load
   document.addEventListener('DOMContentLoaded', function() {
+    // Check if we should show verification card
+    const verificationCard = document.getElementById('verificationCard');
+    const registerCard = document.getElementById('registerCard');
+
+    console.log('Page loaded. Verification card display:', verificationCard ? verificationCard.style.display : 'not found');
+    console.log('Register card display:', registerCard ? registerCard.style.display : 'not found');
+
+    // If verification card should be shown, ensure it's visible
+    if (verificationCard && verificationCard.style.display !== 'none') {
+      console.log('✓ Showing verification card');
+      verificationCard.style.display = 'block';
+      if (registerCard) registerCard.style.display = 'none';
+      return; // Don't run Anki check
+    }
+
+    // Check Anki status
     checkAnkiStatus();
   });
 
   async function checkAnkiStatus() {
     const alert = document.getElementById('anki-status-alert');
-    const submitButton = document.querySelector('button[type="submit"]');
-    
+    // Only target the register form's submit button, not the verification form's
+    const registerForm = document.getElementById('registerForm');
+    const submitButton = registerForm ? registerForm.querySelector('button[type="submit"]') : null;
+
+    // Skip Anki check if verification card is already showing (registration done)
+    const verificationCard = document.getElementById('verificationCard');
+    if (verificationCard && verificationCard.style.display !== 'none') {
+      return;
+    }
+
+    console.log('Checking Anki status at http://localhost:8765...');
+
     try {
       const response = await fetch('http://localhost:8765', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'version', version: 6 })
       });
-      
+
+      console.log('Anki response status:', response.status);
+
       if (!response.ok) {
+        console.error('Anki not responding correctly');
         showAnkiWarning();
         if (submitButton) submitButton.disabled = true;
       } else {
         const data = await response.json();
+        console.log('Anki version data:', data);
         if (!data.result) {
+          console.error('Anki returned no version');
           showAnkiWarning();
           if (submitButton) submitButton.disabled = true;
         } else {
           // Anki is connected successfully
+          console.log('✓ Anki connected successfully, version:', data.result);
           if (alert) {
             alert.classList.add('d-none');
           }
@@ -413,6 +445,7 @@
         }
       }
     } catch (error) {
+      console.error('Anki connection error:', error);
       showAnkiWarning();
       if (submitButton) submitButton.disabled = true;
     }

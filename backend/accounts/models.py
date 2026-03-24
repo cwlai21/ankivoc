@@ -1,6 +1,7 @@
 from django.contrib.auth.models import AbstractUser, Group, Permission
 from django.db import models
 from django.utils import timezone
+from datetime import timedelta
 import random
 import string
 
@@ -119,7 +120,7 @@ class User(AbstractUser):
 		self.verification_code = ''.join(random.choices(string.digits, k=6))
 		self.verification_code_created = timezone.now()
 		# Code expires in 15 minutes
-		self.verification_code_expires = timezone.now() + timezone.timedelta(minutes=15)
+		self.verification_code_expires = timezone.now() + timedelta(minutes=15)
 		self.save(update_fields=['verification_code', 'verification_code_created', 'verification_code_expires'])
 		return self.verification_code
 	

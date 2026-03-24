@@ -53,8 +53,9 @@ class CardPipeline:
         self._executor = concurrent.futures.ThreadPoolExecutor(max_workers=2)
 
         # Timeouts (seconds) for external calls — configurable via settings
-        self._llm_timeout = getattr(settings, 'LLM_CALL_TIMEOUT_SECONDS', 20)
-        self._tts_timeout = getattr(settings, 'TTS_CALL_TIMEOUT_SECONDS', 15)
+        # Increased to 120s to accommodate slow LLM providers and network delays
+        self._llm_timeout = getattr(settings, 'LLM_CALL_TIMEOUT_SECONDS', 120)
+        self._tts_timeout = getattr(settings, 'TTS_CALL_TIMEOUT_SECONDS', 30)
 
     def _create_default_template(self):
         """
@@ -730,16 +731,27 @@ else if (word.includes('\uc744') || word.includes('\ub97c')){{ // 을/를
                 )
                 break  # Success, exit loop
             except concurrent.futures.TimeoutError:
-                raise LLMTranslationError(f'LLM call timed out after {self._llm_timeout}s')
-            except LLMTranslationError as e:
-                if "503" in str(e) and attempt < max_retries - 1:
+                if attempt < max_retries - 1:
                     logger.warning(
-                        f"LLM service unavailable (503). Retrying in {retry_delay} seconds... "
+                        f"LLM call timed out after {self._llm_timeout}s. Retrying in {retry_delay} seconds... "
                         f"(Attempt {attempt + 1}/{max_retries})"
                     )
                     time.sleep(retry_delay)
                 else:
-                    raise  # Re-raise the exception if it's not a 503 or it's the last attempt
+                    raise LLMTranslationError(f'LLM call timed out after {self._llm_timeout}s (failed after {max_retries} attempts)')
+            except LLMTranslationError as e:
+                error_msg = str(e).lower()
+                # Retry on 503, 429 (rate limit), timeout, or connection errors
+                should_retry = any(code in error_msg for code in ['503', '429', 'timeout', 'timed out', 'connection'])
+
+                if should_retry and attempt < max_retries - 1:
+                    logger.warning(
+                        f"LLM error: {e}. Retrying in {retry_delay} seconds... "
+                        f"(Attempt {attempt + 1}/{max_retries})"
+                    )
+                    time.sleep(retry_delay)
+                else:
+                    raise  # Re-raise the exception if not retryable or it's the last attempt
         else:
             # This block executes if the loop completes without a `break`
             raise LLMTranslationError(f"LLM translation failed after {max_retries} attempts.")

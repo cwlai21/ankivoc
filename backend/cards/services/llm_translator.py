@@ -199,7 +199,7 @@ Return ONLY the JSON object. No markdown, no code blocks, no extra text."""
                             'temperature': 0.3,
                             'max_tokens': 1000,
                         }
-                        r = requests.post(url, headers=headers, json=payload, timeout=(5, 60))
+                        r = requests.post(url, headers=headers, json=payload, timeout=(10, 90))
                         if r.status_code == 200:
                             j = r.json()
                             content = j['choices'][0]['message']['content'].strip()
@@ -269,7 +269,7 @@ Return ONLY the JSON object. No markdown, no code blocks, no extra text."""
                             ]
                         }
                         headers = {'Content-Type': 'application/json'}
-                        r = requests.post(url, headers=headers, json=payload, timeout=(5, 60))
+                        r = requests.post(url, headers=headers, json=payload, timeout=(10, 90))
                         if r.status_code == 200:
                             j = r.json()
                             try:
@@ -318,12 +318,24 @@ Return ONLY the JSON object. No markdown, no code blocks, no extra text."""
                     logger.debug('Received content from provider %s', prov)
                     break
 
+            except requests.exceptions.Timeout as e:
+                last_exception = e
+                logger.warning('Provider %s timed out: %s — falling back to next provider', prov, e)
+                continue
+            except requests.exceptions.RequestException as e:
+                last_exception = e
+                logger.warning('Provider %s network error: %s — falling back to next provider', prov, e)
+                continue
             except Exception as e:
                 last_exception = e
                 msg = str(e).lower()
                 # If it's a quota/rate-limit style error, try next provider
                 if '429' in msg or 'quota' in msg or 'resource_exhausted' in msg or 'too many requests' in msg:
                     logger.warning('Provider %s returned quota/rate error: %s — falling back', prov, e)
+                    continue
+                # If it's a timeout or connection error, try next provider
+                if 'timeout' in msg or 'timed out' in msg or 'connection' in msg:
+                    logger.warning('Provider %s connection/timeout error: %s — falling back', prov, e)
                     continue
                 # Otherwise surface the error
                 logger.exception('Provider %s failed with error: %s', prov, e)

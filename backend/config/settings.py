@@ -188,12 +188,18 @@ EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'django.core.mail.backends.console.Em
 EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
 EMAIL_PORT = int(os.getenv('EMAIL_PORT', '587'))
 EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True').lower() == 'true'
+EMAIL_TIMEOUT = int(os.getenv('EMAIL_TIMEOUT', '30'))
 EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
 DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'noreply@ankivocab.com')
+DEFAULT_REPLY_TO = os.getenv('DEFAULT_REPLY_TO', 'noreply@ankivocab.com')
 
 # Site URL for email links
 SITE_URL = os.getenv('SITE_URL', 'http://localhost:8000')
+
+# LLM and TTS Timeout Configuration
+LLM_CALL_TIMEOUT_SECONDS = int(os.getenv('LLM_CALL_TIMEOUT_SECONDS', '120'))
+TTS_CALL_TIMEOUT_SECONDS = int(os.getenv('TTS_CALL_TIMEOUT_SECONDS', '30'))
 
 # Django REST Framework settings
 REST_FRAMEWORK = {

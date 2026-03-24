@@ -1,3 +1,4 @@
+import os
 from rest_framework import status, permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -8,7 +9,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.contrib.auth import authenticate, login as django_login, logout as django_logout
 from django.views import View
-from django.core.mail import send_mail
+from django.core.mail import send_mail, EmailMultiAlternatives
 from django.template.loader import render_to_string
 from django.conf import settings
 from languages.models import Language
@@ -85,6 +86,7 @@ class RegisterView(APIView):
         
         # If Anki is not ready, return error WITHOUT creating user
         if not anki_status['anki_ready']:
+            print(f"✗ Anki not ready: {anki_status['message']}")
             if is_html_form:
                 messages.error(request, anki_status['message'])
                 languages = Language.objects.all().order_by('name')
@@ -110,25 +112,58 @@ class RegisterView(APIView):
         
         # Generate verification code
         verification_code = user.generate_verification_code()
-        
-        # Send verification email
-        email_html = render_to_string('accounts/verification_email.html', {
-            'user': user,
-            'verification_code': verification_code,
-        })
-        email_text = render_to_string('accounts/verification_email.txt', {
-            'user': user,
-            'verification_code': verification_code,
-        })
-        
-        send_mail(
-            subject='Anki Vocabulary Builder Email Verification Code',
-            message=email_text,
-            html_message=email_html,
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[user.email],
-            fail_silently=False,
-        )
+
+        # Send verification email with retry logic
+        email_sent = False
+        max_email_retries = 3
+
+        try:
+            email_html = render_to_string('accounts/verification_email.html', {
+                'user': user,
+                'verification_code': verification_code,
+            })
+            email_text = render_to_string('accounts/verification_email.txt', {
+                'user': user,
+                'verification_code': verification_code,
+            })
+
+            print(f"Attempting to send email to {user.email}...")
+            print(f"Email backend: {settings.EMAIL_BACKEND}")
+            print(f"Email host: {settings.EMAIL_HOST}")
+            print(f"From email: {settings.DEFAULT_FROM_EMAIL}")
+
+            for attempt in range(1, max_email_retries + 1):
+                try:
+                    msg = EmailMultiAlternatives(
+                        subject='Anki Vocabulary Builder Email Verification Code',
+                        body=email_text,
+                        from_email=f'Anki Vocabulary Builder <{settings.DEFAULT_FROM_EMAIL}>',
+                        to=[user.email],
+                        reply_to=[settings.DEFAULT_REPLY_TO],
+                    )
+                    msg.attach_alternative(email_html, "text/html")
+                    result = msg.send(fail_silently=False)
+                    print(f"✓ Verification email sent to {user.email} with code: {verification_code}")
+                    print(f"  send_mail returned: {result} (1 = success) on attempt {attempt}")
+                    email_sent = True
+                    break
+                except Exception as e:
+                    print(f"✗ Email send attempt {attempt}/{max_email_retries} failed: {type(e).__name__}: {e}")
+                    if attempt < max_email_retries:
+                        import time
+                        time.sleep(2)  # Wait 2 seconds before retry
+                    else:
+                        import traceback
+                        traceback.print_exc()
+        except Exception as e:
+            print(f"✗ Failed to prepare verification email: {type(e).__name__}: {e}")
+            import traceback
+            traceback.print_exc()
+
+        if not email_sent:
+            print(f"⚠️  Warning: Could not send verification email to {user.email}")
+            print(f"   Verification code (for console): {verification_code}")
+            # Continue anyway - user can resend code later via the resend button
         
         # Create auth token
         token, _ = Token.objects.get_or_create(user=user)
@@ -139,6 +174,7 @@ class RegisterView(APIView):
             request.session['pending_verification_user_id'] = user.id
             request.session['pending_verification_email'] = user.email
             messages.success(request, 'Registration successful! Please check your email for the verification code.')
+            print(f"✓ Registration successful for {user.username}. Showing verification form.")
             # Don't redirect - stay on the page to show verification code form
             languages = Language.objects.all().order_by('name')
             return render(request, 'accounts/register.html', {
@@ -178,7 +214,7 @@ class LoginView(APIView):
         if not user.email_verified:
             return Response({
                 'error': 'Email not verified',
-                'message': 'Please verify your email address before logging in. Check your inbox for the verification link.',
+                'message': 'Please verify your email address before logging in. Check your inbox for the verification code.',
             }, status=status.HTTP_403_FORBIDDEN)
  
         # Check Anki setup status
@@ -261,18 +297,21 @@ class VerifyCodeView(View):
                 return redirect('accounts-web:login')
             
             # Verify code
+            print(f"Verifying code for {user.username}: received='{verification_code}', stored='{user.verification_code}', expires={user.verification_code_expires}")
             if user.is_verification_code_valid(verification_code):
                 user.email_verified = True
                 user.verification_code = None  # Clear the code after successful verification
                 user.save(update_fields=['email_verified', 'verification_code'])
-                
+
                 # Clear session
                 request.session.pop('pending_verification_user_id', None)
                 request.session.pop('pending_verification_email', None)
-                
+
+                print(f"✓ Email verified successfully for {user.username}")
                 messages.success(request, 'Email verified successfully! You can now log in.')
                 return redirect('accounts-web:login')
             else:
+                print(f"✗ Verification failed for {user.username}")
                 messages.error(request, 'Invalid or expired verification code. Please try again or request a new code.')
                 languages = Language.objects.all().order_by('name')
                 return render(request, 'accounts/register.html', {
@@ -313,27 +352,49 @@ class ResendCodeView(View):
             
             # Generate new verification code
             verification_code = user.generate_verification_code()
-            
-            # Send verification email
-            email_html = render_to_string('accounts/verification_email.html', {
-                'user': user,
-                'verification_code': verification_code,
-            })
-            email_text = render_to_string('accounts/verification_email.txt', {
-                'user': user,
-                'verification_code': verification_code,
-            })
-            
-            send_mail(
-                subject='Anki Vocabulary Builder Email Verification Code',
-                message=email_text,
-                html_message=email_html,
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=[user.email],
-                fail_silently=False,
-            )
-            
-            messages.success(request, 'A new verification code has been sent to your email. Please check your inbox.')
+
+            # Send verification email with retry logic
+            email_sent = False
+            max_email_retries = 3
+
+            try:
+                email_html = render_to_string('accounts/verification_email.html', {
+                    'user': user,
+                    'verification_code': verification_code,
+                })
+                email_text = render_to_string('accounts/verification_email.txt', {
+                    'user': user,
+                    'verification_code': verification_code,
+                })
+
+                for attempt in range(1, max_email_retries + 1):
+                    try:
+                        msg = EmailMultiAlternatives(
+                            subject='Anki Vocabulary Builder Email Verification Code',
+                            body=email_text,
+                            from_email=f'Anki Vocabulary Builder <{settings.DEFAULT_FROM_EMAIL}>',
+                            to=[user.email],
+                            reply_to=[settings.DEFAULT_REPLY_TO],
+                        )
+                        msg.attach_alternative(email_html, "text/html")
+                        msg.send(fail_silently=False)
+                        print(f"✓ Resend verification email sent to {user.email} (attempt {attempt})")
+                        email_sent = True
+                        break
+                    except Exception as e:
+                        print(f"✗ Resend email attempt {attempt}/{max_email_retries} failed: {e}")
+                        if attempt < max_email_retries:
+                            import time
+                            time.sleep(2)
+            except Exception as e:
+                print(f"✗ Failed to prepare resend email: {e}")
+
+            if email_sent:
+                messages.success(request, 'A new verification code has been sent to your email. Please check your inbox.')
+            else:
+                messages.warning(request, 'Could not send email. Please try again in a moment, or contact support.')
+                print(f"⚠️  Resend failed. Verification code (for console): {verification_code}")
+
             languages = Language.objects.all().order_by('name')
             return render(request, 'accounts/register.html', {
                 'languages': languages,
@@ -384,7 +445,7 @@ class WebLoginView(View):
         
         # Check if email is verified
         if not user.email_verified:
-            messages.error(request, 'Please verify your email address before logging in. Check your inbox for the verification link.')
+            messages.error(request, 'Please verify your email address before logging in. Check your inbox for the verification code.')
             return render(request, 'accounts/login.html')
         
         # Check Anki setup status
@@ -408,10 +469,15 @@ class WebLoginView(View):
 
 class WebLogoutView(View):
     """
-    GET /accounts/logout/
+    GET/POST /accounts/logout/
     Logs the user out.
     """
     def get(self, request):
+        django_logout(request)
+        messages.success(request, "You have been successfully logged out.")
+        return redirect('accounts-web:login')
+
+    def post(self, request):
         django_logout(request)
         messages.success(request, "You have been successfully logged out.")
         return redirect('accounts-web:login')
