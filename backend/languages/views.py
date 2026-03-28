@@ -9,10 +9,10 @@ class LanguageListView(generics.ListAPIView):
     List all languages.
     """
     serializer_class = LanguageListSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
+    authentication_classes = []  # Skip auth entirely — invalid tokens must not cause 401
 
     def get_queryset(self):
-        """Return all languages for selection (target/explanation)."""
         return Language.objects.all()
 
 

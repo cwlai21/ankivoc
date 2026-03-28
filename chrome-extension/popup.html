@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Anki Vocab Builder</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+
+  <!-- LOGIN SCREEN -->
+  <div id="screen-login" class="screen">
+    <div class="header">
+      <div class="logo">📚</div>
+      <h1>Anki Vocab Builder</h1>
+      <p class="subtitle">Sign in to add vocabulary</p>
+    </div>
+
+    <div id="login-error" class="alert alert-error hidden"></div>
+
+    <form id="login-form">
+      <div class="form-group">
+        <label for="login-username">Username</label>
+        <input type="text" id="login-username" placeholder="Enter username" autocomplete="username" required>
+      </div>
+      <div class="form-group">
+        <label for="login-password">Password</label>
+        <input type="password" id="login-password" placeholder="Enter password" autocomplete="current-password" required>
+      </div>
+      <button type="submit" id="login-btn" class="btn btn-primary btn-full">
+        <span class="btn-text">Sign In</span>
+        <span class="btn-spinner hidden">⏳</span>
+      </button>
+    </form>
+
+    <div class="footer-link">
+      <a href="#" id="go-to-register">No account? Register</a>
+      &nbsp;·&nbsp;
+      <a href="#" id="go-to-settings-from-login">⚙ Server</a>
+    </div>
+  </div>
+
+  <!-- REGISTER SCREEN -->
+  <div id="screen-register" class="screen hidden">
+    <div class="topbar">
+      <button class="btn-back" id="back-from-register">← Login</button>
+      <span class="topbar-title">Create Account</span>
+    </div>
+
+    <div id="register-error" class="alert alert-error hidden"></div>
+
+    <form id="register-form">
+      <div class="form-group">
+        <label for="reg-username">Username</label>
+        <input type="text" id="reg-username" placeholder="Choose a username" autocomplete="username" required>
+      </div>
+      <div class="form-group">
+        <label for="reg-email">Email</label>
+        <input type="email" id="reg-email" placeholder="your@email.com" autocomplete="email" required>
+      </div>
+      <div class="form-group">
+        <label for="reg-password">Password</label>
+        <input type="password" id="reg-password" placeholder="Min 8 characters" autocomplete="new-password" required>
+      </div>
+      <div class="form-group">
+        <label for="reg-password-confirm">Confirm Password</label>
+        <input type="password" id="reg-password-confirm" placeholder="Repeat password" autocomplete="new-password" required>
+      </div>
+      <button type="submit" id="register-btn" class="btn btn-primary btn-full">
+        <span class="btn-text">Create Account</span>
+        <span class="btn-spinner hidden">⏳</span>
+      </button>
+    </form>
+  </div>
+
+  <!-- VERIFY EMAIL SCREEN -->
+  <div id="screen-verify" class="screen hidden">
+    <div class="topbar">
+      <button class="btn-back" id="back-from-verify">← Back</button>
+      <span class="topbar-title">Verify Email</span>
+    </div>
+
+    <div class="verify-info">
+      <div style="font-size:2rem;text-align:center;margin-bottom:8px;">📧</div>
+      <p id="verify-email-hint" style="text-align:center;font-size:0.82rem;color:#aaa;margin-bottom:14px;">
+        Check your email for a 6-digit code.
+      </p>
+    </div>
+
+    <div id="verify-error" class="alert alert-error hidden"></div>
+    <div id="verify-success" class="alert alert-success hidden"></div>
+
+    <form id="verify-form">
+      <div class="form-group">
+        <label for="verify-code">Verification Code</label>
+        <input type="text" id="verify-code" placeholder="000000" maxlength="6"
+               pattern="[0-9]{6}" inputmode="numeric" autocomplete="one-time-code"
+               style="text-align:center;font-size:1.4rem;letter-spacing:0.4rem;">
+      </div>
+      <button type="submit" id="verify-btn" class="btn btn-primary btn-full">
+        <span class="btn-text">Verify</span>
+        <span class="btn-spinner hidden">⏳</span>
+      </button>
+    </form>
+    <div style="text-align:center;margin-top:10px;">
+      <a href="#" id="resend-code-btn" style="font-size:0.78rem;color:#4a6fa5;">Resend code</a>
+    </div>
+  </div>
+
+  <!-- MAIN SCREEN -->
+  <div id="screen-main" class="screen hidden">
+    <div class="topbar">
+      <span class="topbar-title">📚 Anki Vocab</span>
+      <div class="topbar-actions">
+        <a href="#" id="go-history" title="Batch history">📋</a>
+        <a href="#" id="go-settings" title="Settings">⚙</a>
+        <a href="#" id="logout-btn" title="Logout">🚪</a>
+      </div>
+    </div>
+
+    <div id="main-error" class="alert alert-error hidden"></div>
+    <div id="main-success" class="alert alert-success hidden"></div>
+
+    <!-- Selected text badge -->
+    <div id="selected-text-badge" class="selected-badge hidden">
+      <span id="selected-text-preview"></span>
+      <button id="clear-selected" class="btn-icon" title="Clear">✕</button>
+    </div>
+
+    <form id="batch-form">
+      <div class="form-row">
+        <div class="form-group">
+          <label for="target-language">Target Language</label>
+          <select id="target-language" required>
+            <option value="">Loading…</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="explanation-language">Explanation In</label>
+          <select id="explanation-language">
+            <option value="">Auto</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="vocabulary-input">
+          Vocabulary
+          <button type="button" id="add-selected-btn" class="btn-inline" title="Add selected text from page">+ From page</button>
+        </label>
+        <textarea id="vocabulary-input" rows="6" placeholder="One word or phrase per line&#10;e.g.&#10;bonjour&#10;merci&#10;au revoir"></textarea>
+        <div class="input-hint">One word/phrase per line · max 50</div>
+      </div>
+
+      <button type="submit" id="submit-btn" class="btn btn-primary btn-full">
+        <span class="btn-text">🚀 Create Cards</span>
+        <span class="btn-spinner hidden">Processing…</span>
+      </button>
+    </form>
+  </div>
+
+  <!-- RESULT SCREEN -->
+  <div id="screen-result" class="screen hidden">
+    <div class="topbar">
+      <button class="btn-back" id="back-to-main">← Back</button>
+      <span class="topbar-title">Batch Result</span>
+    </div>
+
+    <div id="result-summary" class="result-summary"></div>
+    <div id="result-cards" class="result-cards"></div>
+  </div>
+
+  <!-- HISTORY SCREEN -->
+  <div id="screen-history" class="screen hidden">
+    <div class="topbar">
+      <button class="btn-back" id="back-from-history">← Back</button>
+      <span class="topbar-title">Recent Batches</span>
+    </div>
+    <div id="history-list" class="history-list">
+      <div class="loading">Loading…</div>
+    </div>
+  </div>
+
+  <!-- SETTINGS SCREEN -->
+  <div id="screen-settings" class="screen hidden">
+    <div class="topbar">
+      <button class="btn-back" id="back-from-settings">← Back</button>
+      <span class="topbar-title">Settings</span>
+    </div>
+
+    <div class="form-group">
+      <label for="server-url">Backend Server URL</label>
+      <input type="url" id="server-url" placeholder="http://localhost:8000">
+      <div class="input-hint">Your Django backend URL (no trailing slash)</div>
+    </div>
+
+    <div class="form-group" id="anki-url-group">
+      <label for="anki-connect-url">AnkiConnect URL</label>
+      <input type="url" id="anki-connect-url" placeholder="http://localhost:8765">
+      <div class="input-hint">Use an <strong>ngrok</strong> URL when backend is on cloud</div>
+    </div>
+
+    <button id="save-settings-btn" class="btn btn-primary btn-full">Save</button>
+    <div id="settings-saved" class="alert alert-success hidden">Settings saved!</div>
+    <div id="settings-error" class="alert alert-error hidden"></div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

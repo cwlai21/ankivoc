@@ -103,12 +103,22 @@ class RegisterView(APIView):
         
         # Anki is ready - proceed with user creation
         user = serializer.save()
-        
+
+        # Set default languages: English as target, Chinese (Mandarin) as explanation
+        try:
+            zh = Language.objects.get(code='zh')
+            en = Language.objects.get(code='en')
+            user.default_target_language = en
+            user.default_explanation_language = zh
+        except Language.DoesNotExist:
+            pass
+
         # Update user Anki status
         user.anki_last_checked = timezone.now()
         user.anki_setup_completed = True
         user.ankiconnect_version = anki_status['version']
-        user.save(update_fields=['anki_last_checked', 'anki_setup_completed', 'ankiconnect_version'])
+        user.save(update_fields=['anki_last_checked', 'anki_setup_completed', 'ankiconnect_version',
+                                 'default_target_language', 'default_explanation_language'])
         
         # Generate verification code
         verification_code = user.generate_verification_code()
@@ -636,6 +646,63 @@ class DownloadAnkiConnectView(APIView):
         })
 
 
-# Views for `accounts` app (placeholder).
+class VerifyEmailAPIView(APIView):
+    """
+    POST /api/v1/auth/verify-email/
+    Verify email with 6-digit code. Requires Token auth (returned by register).
+    """
+    permission_classes = [permissions.IsAuthenticated]
 
-# Implement view functions or class-based views when needed.
+    def post(self, request):
+        code = request.data.get('code', '').strip()
+        if not code:
+            return Response({'error': 'Code is required.'}, status=status.HTTP_400_BAD_REQUEST)
+        user = request.user
+        if user.email_verified:
+            return Response({'message': 'Email already verified.'})
+        if user.is_verification_code_valid(code):
+            user.email_verified = True
+            user.verification_code = None
+            user.save(update_fields=['email_verified', 'verification_code'])
+            return Response({'message': 'Email verified successfully.'})
+        return Response({'error': 'Invalid or expired code.'}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ResendVerificationAPIView(APIView):
+    """
+    POST /api/v1/auth/resend-verification/
+    Resend verification email. Requires Token auth.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+        if user.email_verified:
+            return Response({'message': 'Email already verified.'})
+        verification_code = user.generate_verification_code()
+        email_sent = False
+        try:
+            from django.core.mail import EmailMultiAlternatives
+            from django.template.loader import render_to_string
+            email_html = render_to_string('accounts/verification_email.html', {
+                'user': user, 'verification_code': verification_code,
+            })
+            email_text = render_to_string('accounts/verification_email.txt', {
+                'user': user, 'verification_code': verification_code,
+            })
+            msg = EmailMultiAlternatives(
+                subject='Anki Vocabulary Builder Email Verification Code',
+                body=email_text,
+                from_email=f'Anki Vocabulary Builder <{settings.DEFAULT_FROM_EMAIL}>',
+                to=[user.email],
+            )
+            msg.attach_alternative(email_html, 'text/html')
+            msg.send(fail_silently=False)
+            email_sent = True
+        except Exception as e:
+            print(f'Resend verification email failed: {e}')
+        if email_sent:
+            return Response({'message': f'Verification code sent to {user.email}.'})
+        # Console fallback in development
+        print(f'[DEV] Verification code for {user.username}: {verification_code}')
+        return Response({'message': f'Could not send email. Check server console for code.'})

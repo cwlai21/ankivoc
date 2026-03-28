@@ -11,5 +11,7 @@ urlpatterns = [
     path('change-password/', views.ChangePasswordView.as_view(), name='change-password'),
     path('check-anki/', views.CheckAnkiStatusView.as_view(), name='check-anki'),
     path('download-ankiconnect/', views.DownloadAnkiConnectView.as_view(), name='download-ankiconnect'),
+    path('verify-email/', views.VerifyEmailAPIView.as_view(), name='verify-email'),
+    path('resend-verification/', views.ResendVerificationAPIView.as_view(), name='resend-verification'),
 ]
 

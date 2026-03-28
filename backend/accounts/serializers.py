@@ -71,7 +71,9 @@ class UserProfileSerializer(serializers.ModelSerializer):
  
     default_target_language_name = serializers.SerializerMethodField()
     default_explanation_language_name = serializers.SerializerMethodField()
- 
+    default_target_language_code = serializers.SerializerMethodField()
+    default_explanation_language_code = serializers.SerializerMethodField()
+
     class Meta:
         model = User
         fields = [
@@ -82,25 +84,37 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'anki_connect_api_key',
             'default_target_language',
             'default_target_language_name',
+            'default_target_language_code',
             'default_explanation_language',
             'default_explanation_language_name',
+            'default_explanation_language_code',
             'default_deck_name',
             'date_joined',
             'anki_setup_completed',
             'anki_last_checked',
             'ankiconnect_version',
         ]
-        read_only_fields = ['id', 'username', 'date_joined', 'anki_setup_completed', 
+        read_only_fields = ['id', 'username', 'date_joined', 'anki_setup_completed',
                            'anki_last_checked', 'ankiconnect_version']
- 
+
     def get_default_target_language_name(self, obj):
         if obj.default_target_language:
             return obj.default_target_language.name
         return None
- 
+
     def get_default_explanation_language_name(self, obj):
         if obj.default_explanation_language:
             return obj.default_explanation_language.name
+        return None
+
+    def get_default_target_language_code(self, obj):
+        if obj.default_target_language:
+            return obj.default_target_language.code
+        return None
+
+    def get_default_explanation_language_code(self, obj):
+        if obj.default_explanation_language:
+            return obj.default_explanation_language.code
         return None
  
  
