@@ -75,7 +75,7 @@ function setLoading(btn, loading) {
 
 // ── Init ───────────────────────────────────────────────────────────────────
 async function init() {
-  const stored = await load(['token', 'serverUrl', 'selectedText']);
+  const stored = await load(['token', 'serverUrl', 'selectedText', 'lastBatchResult']);
   state.token = stored.token || null;
   state.serverUrl = (stored.serverUrl || DEFAULT_SERVER).replace(/\/$/, '');
   state.selectedText = stored.selectedText || '';
@@ -85,6 +85,12 @@ async function init() {
     showScreen('screen-main');
     await loadLanguagesAndProfile();
     prefillSelectedText();
+
+    // If the background worker finished a batch while the popup was closed, show it
+    if (stored.lastBatchResult) {
+      await save({ lastBatchResult: null });
+      showResultScreen(stored.lastBatchResult);
+    }
   } else {
     showScreen('screen-login');
   }
@@ -356,26 +362,36 @@ document.getElementById('batch-form').addEventListener('submit', async e => {
     await api('/api/v1/auth/profile/', { method: 'PATCH', body: JSON.stringify(langPayload) });
   } catch {} // Non-critical — ignore failures
 
+  document.getElementById('vocabulary-input').value = '';
+  state.selectedText = '';
+  document.getElementById('selected-text-badge').classList.add('hidden');
+
+  const payload = { target_language: targetLang, vocabulary };
+  if (explLang) payload.explanation_language = explLang;
+
   setLoading(btn, true);
-  try {
-    const payload = { target_language: targetLang, vocabulary };
-    if (explLang) payload.explanation_language = explLang;
 
-    const result = await api('/api/v1/cards/batches/', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    });
-
-    document.getElementById('vocabulary-input').value = '';
-    state.selectedText = '';
-    document.getElementById('selected-text-badge').classList.add('hidden');
-
-    showResultScreen(result);
-  } catch (err) {
-    showError('main-error', err.message);
-  } finally {
-    setLoading(btn, false);
-  }
+  // Delegate to background service worker so the fetch survives popup close
+  chrome.runtime.sendMessage(
+    { type: 'CREATE_BATCH', serverUrl: state.serverUrl, token: state.token, payload },
+    resp => {
+      setLoading(btn, false);
+      if (!resp) {
+        showError('main-error', 'No response from background worker.');
+        return;
+      }
+      if (resp.ok) {
+        showResultScreen(resp.data);
+      } else {
+        if (resp.status === 401) {
+          state.token = null;
+          save({ token: null });
+          showScreen('screen-login');
+        }
+        showError('main-error', resp.error);
+      }
+    }
+  );
 });
 
 // ── Result screen ──────────────────────────────────────────────────────────
