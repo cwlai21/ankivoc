@@ -1,0 +1,9 @@
+{
+  "name": "com.ankivoc.server",
+  "description": "Manages Django server for Anki Vocab Builder Chrome extension",
+  "path": "/Users/cwlai/Projects/LangChain_AI/server_host.py",
+  "type": "stdio",
+  "allowed_origins": [
+    "chrome-extension://abogehmpggnbedjoghdkidgibmdhpefe/"
+  ]
+}

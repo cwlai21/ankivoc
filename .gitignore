@@ -3,6 +3,8 @@
 .python-version
 .env*
 *.json
+!chrome-extension/manifest.json
+!com.ankivoc.server.json
 test.py
 anki_voc_*.csv
 media/

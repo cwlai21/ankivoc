@@ -75,6 +75,16 @@ function setLoading(btn, loading) {
 
 // ── Init ───────────────────────────────────────────────────────────────────
 async function init() {
+  // Show "starting" screen while we ensure the server is up
+  showScreen('screen-starting');
+
+  const result = await chrome.runtime.sendMessage({ type: 'ENSURE_SERVER' });
+  if (!result?.ok) {
+    document.getElementById('starting-status').textContent =
+      '❌ Could not start server: ' + (result?.error || 'unknown error');
+    return;
+  }
+
   const stored = await load(['token', 'serverUrl', 'selectedText', 'lastBatchResult']);
   state.token = stored.token || null;
   state.serverUrl = (stored.serverUrl || DEFAULT_SERVER).replace(/\/$/, '');
