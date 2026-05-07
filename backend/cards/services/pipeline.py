@@ -421,26 +421,25 @@ hr#answer {
             JavaScript code string
         """
         if lang_code == 'fr':
-            # French: Detect gender by article (de la, du, des)
+            # French: Detect gender using article prefix and Conjugaison/Gender field.
+            # "de l'" applies to both genders (vowel-starting words), so we fall back
+            # to reading the gender field directly.
             return f'''
-if ("{{{{{field_name}}}}}".startsWith('de la ')){{
-    document.getElementById('register').classList.add('feminine');
-}}
-else if ("{{{{{field_name}}}}}".startsWith('du ')){{
-    document.getElementById('register').classList.add('masculine');
-}}
-else if ("{{{{{field_name}}}}}".startsWith('des ')){{
-    document.getElementById('register').classList.add('neuter');
-}}
-else if ("{{{{{field_name}}}}}".startsWith('la ')){{
-    document.getElementById('register').classList.add('feminine');
-}}
-else if ("{{{{{field_name}}}}}".startsWith('le ')){{
-    document.getElementById('register').classList.add('masculine');
-}}
-else if ("{{{{{field_name}}}}}".startsWith('les ')){{
-    document.getElementById('register').classList.add('neuter');
-}}
+(function() {{
+    var word = "{{{{{field_name}}}}}";
+    var gender = "{{{{Conjugaison/Gender}}}}".toLowerCase();
+    var el = document.getElementById('register');
+    if (!el) return;
+    if (word.startsWith('de la ') || word.startsWith('la ') ||
+            (word.startsWith("de l'") && (gender.indexOf('féminin') >= 0 || gender.indexOf('feminin') >= 0))) {{
+        el.classList.add('feminine');
+    }} else if (word.startsWith('du ') || word.startsWith('le ') ||
+            (word.startsWith("de l'") && gender.indexOf('masculin') >= 0)) {{
+        el.classList.add('masculine');
+    }} else if (word.startsWith('des ') || word.startsWith('les ')) {{
+        el.classList.add('neuter');
+    }}
+}})();
 '''
         elif lang_code == 'es':
             # Spanish: Detect gender by article (la, el, las, los)
