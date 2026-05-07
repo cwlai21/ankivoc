@@ -329,9 +329,11 @@ Return ONLY the JSON object. No markdown, no code blocks, no extra text."""
             except Exception as e:
                 last_exception = e
                 msg = str(e).lower()
-                # If it's a quota/rate-limit style error, try next provider
-                if '429' in msg or 'quota' in msg or 'resource_exhausted' in msg or 'too many requests' in msg:
-                    logger.warning('Provider %s returned quota/rate error: %s — falling back', prov, e)
+                # If it's a quota/rate-limit or temporary availability error, try next provider
+                if ('429' in msg or 'quota' in msg or 'resource_exhausted' in msg or 'too many requests' in msg
+                        or '503' in msg or 'unavailable' in msg or 'service_unavailable' in msg
+                        or '502' in msg or '529' in msg or 'overloaded' in msg or 'high demand' in msg):
+                    logger.warning('Provider %s returned quota/availability error: %s — falling back', prov, e)
                     continue
                 # If it's a timeout or connection error, try next provider
                 if 'timeout' in msg or 'timed out' in msg or 'connection' in msg:

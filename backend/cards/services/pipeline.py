@@ -310,20 +310,17 @@ Reading & Spelling
     word-wrap: break-word;
 }
 
-/* Gender-specific styling */
-.feminine {
-    border-left: 5px solid #f472b6;
-    padding-left: 15px;
+/* Gender-specific word coloring */
+.Text_big.feminine {
+    color: #f87171;
 }
 
-.masculine {
-    border-left: 5px solid #60a5fa;
-    padding-left: 15px;
+.Text_big.masculine {
+    color: #60a5fa;
 }
 
-.neuter {
-    border-left: 5px solid #6ee7b7;
-    padding-left: 15px;
+.Text_big.neuter {
+    color: #818cf8;
 }
 
 /* Examples List */
@@ -823,7 +820,10 @@ else if (word.includes('\uc744') || word.includes('\ub97c')){{ // 을/를
                         if plural_form_match:
                             plural_form = plural_form_match.group(1)
                             # Check if the plural form is just the cleaned word + 's' or 'x'
-                            if plural_form.startswith(cleaned_word.lower()) and plural_form.endswith(('s', 'x')):
+                            # Use only the first word of cleaned_word for multi-word nouns
+                            # e.g. cleaned_word="cabine d'essayage", plural_form="cabines"
+                            first_word = cleaned_word.lower().split()[0] if cleaned_word else ''
+                            if plural_form.startswith(first_word) and plural_form.endswith(('s', 'x')):
                                 # This is likely a case like "égout" -> "égouts"
                                 # where the base word is singular.
                                 ignore_pluriel = True
@@ -853,7 +853,12 @@ else if (word.includes('\uc744') || word.includes('\ub97c')){{ // 을/를
                             else:
                                 article = 'de la'
 
-                    final_text = f"{article} {front}".strip() if article else front
+                    if article:
+                        # Don't add a space when article ends with apostrophe (e.g. "de l'")
+                        sep = '' if article.endswith("'") else ' '
+                        final_text = f"{article}{sep}{front}".strip()
+                    else:
+                        final_text = front
 
                     if final_text != original_front:
                         logger.info(
@@ -881,13 +886,22 @@ else if (word.includes('\uc744') || word.includes('\ub97c')){{ // 을/를
         voice = self.target_lang.azure_tts_voice
         locale = self.target_lang.azure_tts_locale
  
+        # For TTS, "de l'xxx" sounds unnatural — replace with "un/une xxx" based on gender
+        tts_word = card.target_word
+        if tts_word and tts_word.lower().startswith("de l'"):
+            bare_word = tts_word[5:]  # strip "de l'"
+            conjugaison_lower = (card.conjugaison_genre or '').lower()
+            is_feminin = any(t in conjugaison_lower for t in ('feminin', 'féminin', 'feminine', 'f.'))
+            tts_word = f"une {bare_word}" if is_feminin else f"un {bare_word}"
+            logger.info("TTS word adjusted from '%s' to '%s'", card.target_word, tts_word)
+ 
         # Word audio (skip if already populated by batch TTS)
         if card.target_word and not card.audio_file:
             try:
                 audio_path = self._run_with_timeout(
                     self.tts.synthesize_word,
                     self._tts_timeout,
-                    text=card.target_word,
+                    text=tts_word,
                     voice=voice,
                     locale=locale,
                     card_id=card.id,
