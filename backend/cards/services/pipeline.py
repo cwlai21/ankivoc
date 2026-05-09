@@ -839,7 +839,7 @@ else if (word.includes('\uc744') || word.includes('\ub97c')){{ // 을/를
 
                     article = ''
                     if not is_adjectif:
-                        if is_plural and not original_is_plural:
+                        if is_plural and not original_is_plural and not (is_masculin or is_feminin):
                             article = 'des'
                         elif is_masculin:
                             if starts_with_vowel:
